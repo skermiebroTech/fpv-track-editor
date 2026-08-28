@@ -1,0 +1,23 @@
+# Conversion code lives on disk so the editor's .trk import keeps working
+# locally, but is not published. Do not remove the files — the editor needs
+# them at runtime for VD -> MRSIM import.
+/convert/
+/convert.js
+
+# MRSIM object meshes/textures decoded from MRSIM.dkb are the game
+# developer's copyrighted assets. Never redistributed. The published
+# editor renders these objects procedurally from their collision
+# primitives; the .glb files stay local as a cache.
+models/mrsim/*
+!models/mrsim/models.json
+
+# node deps if you install anything for local tooling; the editor itself
+# runs from a CDN import map with no build step.
+node_modules/
+
+# ad-hoc local runner scripts
+/_*.mjs
+
+# tool droppings
+.claude/
+__pycache__/
