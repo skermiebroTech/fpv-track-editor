@@ -5965,12 +5965,12 @@ window.__templates = {
   clear: () => { imgTemplates = []; renderTemplateScene(); renderTemplatePanel(); saveTemplates(); },
 };
 
-// initial load: ?track= param, else first bundled. Diagnostics stays closed —
+// initial load: ?track= param, else a blank track. Diagnostics stays closed —
 // the toolbar chip reports validity, and load/parse/import errors open the
 // panel on their own via setDiag(true).
 document.getElementById('btnUndo').onclick = undoEdit;
 document.getElementById('btnRedo').onclick = redoEdit;
 const qs = new URLSearchParams(location.search).get('track');
 if (qs) { syncTrackSel(-1); loadFromUrl(qs); }
-else { syncTrackSel(0); loadFromUrl(BUNDLED[0][0]); }
+else { syncTrackSel(-1); loadFromText(NEW_TRACK_XML, 'new-track.xml').then(() => setEditMode(true)); }
 </script>
