@@ -876,23 +876,23 @@ import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { parseMrsim, includeEntityNames } from './mrsim.js';
 // the export credit — a tiny dependency-free module, so stamping a credit never
-// has to pull in the (lazily loaded) VelociDrone converter
+// has to pull in the (lazily loaded) VelociDrone importer
 import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
-  from './convert/credit.js';
+  from './lib/credit.js';
 // LED / neon shapes + the emissive material, shared with the VelociDrone
-// converter so a placed neon ring and a converted one are the same object
-import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './convert/neon.js';
+// importer so a placed neon ring and a imported one are the same object
+import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
-// / the file picker. These are the converter outputs + a community track.
+// / the file picker. These are the importer outputs + a community track.
 const BUNDLED = [
   ['tracks/2026-australian-nationals-final.xml', '2026 Australian Nationals (final)'],
   ['tracks/First practice with a double cube-sloogus.xml', 'community: double-cube (sloogus)'],
-  ['tracks/converted-au-nats.xml',       'converted: 2024 AU Nats Quali'],
-  ['tracks/converted-2026-au-nats.xml',  'converted: 2026 AU Nats'],
-  ['tracks/converted-aus-nats.xml',      'converted: AUS Nats'],
-  ['tracks/converted-dutch.xml',         'converted: Dutch Drone Madness'],
+  ['tracks/imported-au-nats.xml',       'imported: 2024 AU Nats Quali'],
+  ['tracks/imported-2026-au-nats.xml',  'imported: 2026 AU Nats'],
+  ['tracks/imported-aus-nats.xml',      'imported: AUS Nats'],
+  ['tracks/imported-dutch.xml',         'imported: Dutch Drone Madness'],
 ];
 
 // ---------------------------------------------------------------------------
@@ -1428,7 +1428,7 @@ async function build(data, keepCamera = false) {
   let groundY = Infinity;
 
   // Exact colour for a prim that names an inline <Material> in this doc (the
-  // converter's gate posts/banner + fabric panels): read its PBR baseColor so
+  // importer's gate posts/banner + fabric panels): read its PBR baseColor so
   // the editor shows the real in-game colour, not a generic hint fallback.
   // Library materials (DroneTrackMaterials, poles…) aren't in the doc -> null,
   // and those prims keep their hint colour. baseColor is LINEAR, like MRMAT.
@@ -1460,7 +1460,7 @@ async function build(data, keepCamera = false) {
 
     // prims from the same library file as a rendered mesh are that mesh's
     // collision shadow — drawing both doubles up. Sibling prims from OTHER
-    // sources (e.g. the converter's riser pole under a lifted flag) still draw.
+    // sources (e.g. the importer's riser pole under a lifted flag) still draw.
     const meshSrcs = new Set((el.models || [])
       .filter(m => templates.has(m.model)).map(m => m.src));
 
@@ -1562,7 +1562,7 @@ async function build(data, keepCamera = false) {
   return { visits, gateWidths, groundY, courseBox };
 }
 
-// Render the world the track was built in. Empty Grass World (converter target)
+// Render the world the track was built in. Empty Grass World (importer target)
 // has no mesh — just a flat ground plane. Named locations (Baylands Park,
 // Hardesty BMX Track) ship a real terrain mesh; load it at MRSIM world origin
 // (same Z-up->Y-up basis as the elements). Falls back to a plane at groundY.
@@ -1673,10 +1673,10 @@ function renderDiag(data, extra) {
       `<div class="chips">${Object.entries(counts).map(([k, v]) => chip(KIND_LABEL[k] || k, v)).join('')}</div>` +
     `</section>` +
 
-    (editState?.migrated?.converted || editState?.migrated?.credit
+    (editState?.migrated?.imported || editState?.migrated?.credit
       ? `<section><div class="warn">⟳ ${[
-            editState.migrated.converted
-              ? `updated ${editState.migrated.converted} legacy collision tag(s) ` +
+            editState.migrated.imported
+              ? `updated ${editState.migrated.imported} legacy collision tag(s) ` +
                 `(contactMaterial → material)` +
                 (editState.migrated.sensors
                   ? `, incl. ${editState.migrated.sensors} checkpoint sensor(s) that ` +
@@ -1708,7 +1708,7 @@ function renderDiag(data, extra) {
         `<td>${num3(s.dir.x)}, ${num3(s.dir.y)}, ${num3(s.dir.z)}</td></tr>`
       ).join('') + `</table></details></section>`;
   // innerHTML above detaches the #err node prepended at init — put it back, or
-  // the next parse/load/convert error writes into an orphan and shows nothing
+  // the next parse/load/import error writes into an orphan and shows nothing
   diagEl.prepend(errEl);
 }
 function escapeHtml(s) { return String(s).replace(/[&<>"]/g, c => (
@@ -1747,11 +1747,11 @@ function migrateLegacyDoc(doc) {
     sc.setAttribute('material', v);
     if (v === '-1') sensors++;       // the ones that were flying solid
   }
-  return { converted: stale.length, sensors, credit: migrateLegacyCredit(doc) };
+  return { imported: stale.length, sensors, credit: migrateLegacyCredit(doc) };
 }
 
-// Tracks exported before the credit banner existed still carry the converter's
-// old <!-- Converted from VelociDrone by track-viewer --> header. Swap it for
+// Tracks exported before the credit banner existed still carry the importer's
+// old <!-- Imported from VelociDrone by track-viewer --> header. Swap it for
 // the current credit here rather than waiting for the export, so what the panel
 // reports and what the file will contain are the same thing. stampCredit clears
 // every credit-shaped comment, so pass any name already on the file through or
@@ -1774,15 +1774,15 @@ document.getElementById('migrateOk').addEventListener('click',
 // track is the kind of thing they should hear about, especially as it only
 // sticks if they export.
 function showMigrationNotice(m) {
-  if (!m.converted && !m.credit) { migrateEl.classList.remove('show'); return; }
+  if (!m.imported && !m.credit) { migrateEl.classList.remove('show'); return; }
   const s1 = n => n === 1 ? '' : 's';
   const did = [];
-  if (m.converted)
-    did.push(`converted <b>${m.converted}</b> collision tag${s1(m.converted)} to <b>material</b>`);
+  if (m.imported)
+    did.push(`imported <b>${m.imported}</b> collision tag${s1(m.imported)} to <b>material</b>`);
   if (m.credit)
     did.push('replaced the old <b>track-viewer</b> header with the current credit');
   document.getElementById('migrateText').innerHTML =
-    (m.converted
+    (m.imported
       ? 'This track was built for an older MRSIM: its collision tags use the old ' +
         '<b>contactMaterial</b> name, which the current game ignores' +
         (m.sensors
@@ -1920,7 +1920,7 @@ function localMatrixDom(el) {
 }
 
 // A library <Include> dropped straight into the track with no <Entity name=…>
-// around it — how the converter and the blank-track template place the launch
+// around it — how the importer and the blank-track template place the launch
 // mat and launch stand (the start block). The entity it produces is named
 // inside the library file, so it never matches a doc entity; map those names to
 // the include itself and the usual "nearest wrapper <Transform>" rule below
@@ -2727,7 +2727,7 @@ async function doRebuildFromDoc(opts = {}) {
 // EdColor_<HEX> material (created on demand). Scope: this item / all of the
 // same type / all items. The chosen sRGB colour is stored as a LINEAR baseColor
 // so it shows the same in the editor (see docMat) and in-game.
-// hexToLinear / GLOW_HDR come from convert/neon.js: MRSIM's own drone LEDs
+// hexToLinear / GLOW_HDR come from lib/neon.js: MRSIM's own drone LEDs
 // (RaceLEDs.model, painted with DroneRenderingMaterials.xml's "LEDLighting")
 // are a PBREmissive material — a near-black baseColor plus an HDR `emissive`
 // uniform whose values run past 1 so the bloom pass catches them, and glowing
@@ -2771,7 +2771,7 @@ function itemTransforms() {
   return [...set];
 }
 // an object's "type" for group recolouring: its entity-name prefix (trkGate,
-// blk, decoFlag, trkCheck, hurdle…). kind is 'deco' for every converter object,
+// blk, decoFlag, trkCheck, hurdle…). kind is 'deco' for every importer object,
 // so the name prefix is the meaningful grouping.
 function typeOfTransform(tr) {
   const ent = [...tr.children].find(c => c.tagName === 'Entity');
@@ -2947,16 +2947,16 @@ const MACRO_SHIFTS = {
 };
 
 // ---------------------------------------------------------------------------
-// TRACK OBJECTS — the things the VelociDrone converter emits, as placeable
+// TRACK OBJECTS — the things the VelociDrone importer emits, as placeable
 // palette entries. MRSIM's own library has no MultiGP hurdle, no feather flag
 // with a one-sided pass, no true-size race gate and no bare window-pane
-// checkpoint, so hand-fixing a converted track used to mean editing XML. These
+// checkpoint, so hand-fixing a imported track used to mean editing XML. These
 // are built from the same component schema as the object builder (`parts` +
 // optional `pass`), so placement, hover preview, placement ghost, duplicate,
-// recolour and undo all work on them for free — and they carry the converter's
-// own material names, so a placed object matches the converted ones beside it.
+// recolour and undo all work on them for free — and they carry the importer's
+// own material names, so a placed object matches the imported ones beside it.
 //
-// Sizes are the converter's, for VD's standard prefabs: MGPHurdle 3.04 x 1.52
+// Sizes are the importer's, for VD's standard prefabs: MGPHurdle 3.04 x 1.52
 // panel, DefaultMGP4MFlag 5.6 m pole with the cloth on one side and the
 // trigger wall running out of the OTHER (pole) side, and the 3.2 m race gate
 // whose true aperture is 2.96 x 2.46.
@@ -3077,7 +3077,7 @@ function customDefs() {
   const seen = new Set(CUSTOM_LOCAL.map(c => c.id));
   return [...CUSTOM_LOCAL, ...CUSTOM_SHARED.filter(c => !seen.has(c.id))];
 }
-// built-ins + converter track objects + custom — the full placeable set
+// built-ins + importer track objects + custom — the full placeable set
 // (palette, place() hook, arm). A user component with the same id shadows a
 // track object, same as it shadows a repo-shared one.
 function allPalette() {
@@ -3109,7 +3109,7 @@ function cpListEl(create = false) {
 }
 
 // where new objects go: the parent holding the CheckpointList (the track
-// entity in converter/community files), else the root <Simulation>
+// entity in importer/community files), else the root <Simulation>
 function insertParent() {
   const list = editState.doc.getElementsByTagName('CheckpointList')[0];
   return list ? list.parentNode : rootSim();
@@ -3145,16 +3145,16 @@ function ensureRootInclude(file, ops) {
   ops.push({ type: 'insert', node: inc });
 }
 
-// ---- custom gates (the converter's true-size frames) ----------------------
-// PBR fabric/frame materials, matching the converter's output; added to the
-// doc on demand so a converted-or-blank track renders them in-game.
+// ---- custom gates (the importer's true-size frames) ----------------------
+// PBR fabric/frame materials, matching the importer's output; added to the
+// doc on demand so a imported-or-blank track renders them in-game.
 const GATE_MATERIALS = {
   GatePostMaterial:        [0.93, 0.93, 0.9, '.4'],
   GateBannerMaterial:      [0.09, 0.13, 0.38, '.5'],
   GateStartBannerMaterial: [0.55, 0.05, 0.05, '.4'],
   GateFabricMaterial:      [0.9, 0.35, 0.05, '.85'],
-  // the rest of the converter's palette, so a hand-placed track object shares
-  // its materials with the converted objects already in the document
+  // the rest of the importer's palette, so a hand-placed track object shares
+  // its materials with the imported objects already in the document
   HurdlePanelMaterial:     [0.6, 0.6, 0.6, '.4'],
   FlagRiserMaterial:       [0.1, 0.1, 0.1, '.6'],
   FlagClothMaterial:       [0.92, 0.92, 0.9, '.7'],
@@ -3184,7 +3184,7 @@ function ensureGateMaterials(kind, ops) {
   if (kind !== 'square') ensureMaterial('GateFabricMaterial', ops);
 }
 // A frame of two posts + a top banner + a checkpoint sensor. 'fabric' keeps the
-// converter's 2.96 m frame and adds a 2 m × 2 m ground-standing fabric window
+// importer's 2.96 m frame and adds a 2 m × 2 m ground-standing fabric window
 // (sides + top, open at the ground); 'square' is a 2.5 m × 2.5 m open frame.
 function buildCustomGate(doc, ent, name, kind) {
   const sq = kind === 'square';
@@ -3359,12 +3359,12 @@ function buildCustomComponent(doc, ent, name, def, ops) {
     for (const k in attrs) if (attrs[k] !== undefined && attrs[k] !== '') e.setAttribute(k, attrs[k]); return e; };
   const usedSuffixes = new Set();
   (def.parts || []).forEach((part, i) => {
-    // a named material (the converter's own), a glowing LED/neon colour, or a
+    // a named material (the importer's own), a glowing LED/neon colour, or a
     // plain colour swatch
     let material;
     if (part.material) { ensureMaterial(part.material, ops); material = part.material; }
     else material = ensureColorMaterial(part.color || '#c8c8c8', ops, !!part.glow);
-    // `suffix` lets a built-in track object keep the converter's own part
+    // `suffix` lets a built-in track object keep the importer's own part
     // names (_postL/_banner/_pole/_cloth). That is not cosmetic: the start-
     // gate machinery finds a gate's banner by material OR by a name ending
     // in "banner", so a recoloured `_p2` banner would leave the track with no
@@ -3392,7 +3392,7 @@ function buildCustomComponent(doc, ent, name, def, ops) {
       e.appendChild(mkPolyhedronEl(doc, part.shape, (part.dims || []).map(v => +v || 0)));
     else e.appendChild(mk('Box', { x: d[0] || '0.5', y: d[1] || '0.5', z: d[2] || '0.5' }));
     // solid:false = render only, no collider — VD flag cloth is soft enough to
-    // brush at race speed, so the converter never makes it a hard surface
+    // brush at race speed, so the importer never makes it a hard surface
     if (part.solid !== false) e.appendChild(mk('StaticContact', { material: 'TrackPart' }));
     // subdivisions tessellates curved prims (BaylandsPark spheres use 32)
     e.appendChild(mk('MeshRendererComponent', { material,
@@ -3452,7 +3452,7 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     pass.appendChild(inc);
     ent.appendChild(pass);
   } else if (def.sensor) {
-    // bare trigger volume, the converter's pattern: 3 m wide, 2.5 m tall
+    // bare trigger volume, the importer's pattern: 3 m wide, 2.5 m tall
     const pass = doc.createElement('Entity');
     pass.setAttribute('name', name + '_pass');
     const wf = doc.createElement('WorldFromEntityComponent');
@@ -4202,7 +4202,7 @@ function renderPalette() {
     track.forEach(def => {
       const b = mkBtn(def);
       b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
-        ' · what the VD converter emits';
+        ' · what the VD importer emits';
       pal.appendChild(b);
     });
   }
@@ -4771,7 +4771,7 @@ function addPart(shape) {
 // ---- OBJ import ------------------------------------------------------------
 // Wavefront OBJ -> one 'mesh' part. Only geometry is read (v + f; materials,
 // normals and UVs are ignored — MRSIM colours the whole polyhedron with one
-// material anyway). OBJ is y-up: converted to MRSIM z-up by (x,y,z)->(x,-z,y),
+// material anyway). OBJ is y-up: imported to MRSIM z-up by (x,y,z)->(x,-z,y),
 // a proper rotation, so the CCW winding survives. Faces with 4+ vertices are
 // fan-triangulated; negative indices resolve relative to the vertices so far.
 const OBJ_TRI_LIMIT = 5000;
@@ -5145,9 +5145,9 @@ window.__build = {
   addPart: shape => { if (builderState) { addPart(shape); return builderState.def.parts.length; } return 0; },
   importObj: (text, name) => { try { return importObjText(text, name || 'import.obj'); }
     catch (e) { return 'error: ' + e.message; } },
-  // convert a track element -> builder component (without opening the modal)
+  // import a track element -> builder component (without opening the modal)
   fromElement: name => elementToComponent(name),
-  // convert a SET of elements -> one merged component (the multi-select copy)
+  // import a SET of elements -> one merged component (the multi-select copy)
   fromSelection: (names, primary) => selectionToComponent(names, primary ?? names[names.length - 1]),
   // select an element and copy it into the builder (mirrors the panel button)
   copyFromTrack: name => {
@@ -5347,7 +5347,7 @@ addEventListener('keydown', e => {
 });
 
 // The credit banner an exported <Simulation> carries. A re-export REPLACES the
-// existing one (and the converter's legacy line) instead of stacking copies, and
+// existing one (and the importer's legacy line) instead of stacking copies, and
 // the name already in the file pre-fills the prompt — so exporting the same
 // track twice is one Enter, not a retype.
 let lastPilot = '';
@@ -5385,7 +5385,7 @@ function exportXml() {
   a.click();
   URL.revokeObjectURL(a.href);
   // the repaired track is now on disk — retire the migration prompt
-  if (editState.migrated?.converted || editState.migrated?.credit) {
+  if (editState.migrated?.imported || editState.migrated?.credit) {
     editState.migrated.saved = true;
     migrateEl.classList.remove('show');
   }
@@ -5470,7 +5470,7 @@ window.__edit = {
   newTrack: () => document.getElementById('btnNew').onclick(),
   importText: (text, name) => document.getElementById('file').onchange
     ? (async () => { if (/\.(trk|json)$/i.test(name)) {
-        const { xml } = await convertVdText(text, name);
+        const { xml } = await importVdText(text, name);
         await loadFromText(xml, name + '-MRSIM.xml');
       } else await loadFromText(text, name); })() : null,
 };
@@ -5493,20 +5493,20 @@ trackSel.onchange = () => {
 };
 
 // import: MRSIM .xml directly; VelociDrone .trk / viewer .json through the
-// same converter the main viewer uses (checkpoints face the lap direction,
+// same importer the main viewer uses (checkpoints face the lap direction,
 // full-aperture gate sensors — no ghost lines here, path-derived facing)
-let convertMods = null;
-async function convertVdText(text, fileName) {
-  if (!convertMods) {
+let importMods = null;
+async function importVdText(text, fileName) {
+  if (!importMods) {
     const [conv, trk, cat, dims] = await Promise.all([
-      import('./convert.js'), import('./trk.js?v=11'),
+      import('./import.js'), import('./trk.js?v=11'),
       fetch('tracks/prefabs.json').then(r => r.json()),
       fetch('tracks/prefab-dims.json').then(r => r.json()),
     ]);
     const { classify, prefabName, gateWidthFor, heightFor, boundsFor } = conv.makeClassifier(cat, dims);
-    convertMods = { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor };
+    importMods = { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor };
   }
-  const { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor } = convertMods;
+  const { conv, trk, classify, prefabName, gateWidthFor, heightFor, boundsFor } = importMods;
   const data = /^\s*\{/.test(text) ? JSON.parse(text) : trk.parseTrk(text, fileName);
   if (!Array.isArray(data.gates)) throw new Error('no gates in this track');
   const { xml, warnings } = conv.vdToMrsim(data, classify, prefabName,
@@ -5520,19 +5520,19 @@ document.getElementById('file').onchange = async e => {
   syncTrackSel(-1);
   const text = await f.text();
   if (/\.(trk|json)$/i.test(f.name)) {
-    statusEl.textContent = 'converting VD track…';
+    statusEl.textContent = 'importing VD track…';
     try {
-      const { xml, warnings, name } = await convertVdText(text, f.name);
+      const { xml, warnings, name } = await importVdText(text, f.name);
       await loadFromText(xml, name + '-MRSIM.xml');
       if (warnings.length) {
-        errEl.textContent = 'converter notes:\n· ' + warnings.join('\n· ');
+        errEl.textContent = 'importer notes:\n· ' + warnings.join('\n· ');
         setDiag(true);
       }
     } catch (err) {
-      statusEl.textContent = 'convert error';
+      statusEl.textContent = 'import error';
       setDiag(true);
-      diagChipError('convert failed', 'CONVERT ERROR: ' + err.message);
-      errEl.textContent = 'CONVERT ERROR: ' + err.message;
+      diagChipError('import failed', 'IMPORT ERROR: ' + err.message);
+      errEl.textContent = 'IMPORT ERROR: ' + err.message;
     }
   } else {
     await loadFromText(text, f.name);
@@ -5983,7 +5983,7 @@ window.__templates = {
 };
 
 // initial load: ?track= param, else first bundled. Diagnostics stays closed —
-// the toolbar chip reports validity, and load/parse/convert errors open the
+// the toolbar chip reports validity, and load/parse/import errors open the
 // panel on their own via setDiag(true).
 document.getElementById('btnUndo').onclick = undoEdit;
 document.getElementById('btnRedo').onclick = redoEdit;

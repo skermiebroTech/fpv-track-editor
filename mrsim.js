@@ -17,7 +17,7 @@
 //
 // Coordinates: metres, right-handed Z-up (x/y ground plane). Rotations are
 // axis-angle attributes (rx/ry/rz = axis, angleDegrees or angle in radians).
-// Converted here to three.js Y-up: (x, y, z) -> (x, z, -y).
+// Remapped here to three.js Y-up: (x, y, z) -> (x, z, -y).
 // ===========================================================================
 import * as THREE from 'three';
 import { MRSIM_LIB } from './mrsim-lib.js';
@@ -100,10 +100,10 @@ function matHint(shape, dims, material, tags) {
     if (/FlagStalk/.test(material)) return 'stalk';
     if (/GateTop/.test(material)) return 'panelTop';
     if (/GateSide|Hurdle/.test(material)) return 'panelSide';
-    // converted VelociDrone blocks (emitted by convert.js)
+    // imported VelociDrone blocks (emitted by import.js)
     const blk = material.match(/^Block(\w+?)Material$/);
     if (blk) return `blk:${blk[1]}`;
-    // LED / neon: an emissive material named for its own colour (convert/neon.js)
+    // LED / neon: an emissive material named for its own colour (lib/neon.js)
     const glow = material.match(/^EdGlow_([0-9A-Fa-f]{6})$/);
     if (glow) return `glow:${glow[1].toLowerCase()}`;
   }
@@ -421,7 +421,7 @@ function walkInclude(node, ctx, st) {
 // The element names an <Include> contributes to the scene — the top-level named
 // entities of the library file, recursing through the library's own includes.
 // Everything a track places through a named <Entity> is findable in the track
-// document, but a bare include (the launch mat and launch stand a converted or
+// document, but a bare include (the launch mat and launch stand a imported or
 // blank track drops straight under <Entity name="Track">) names its entity only
 // inside the library file. The editor uses this to map such a name back to the
 // <Include> that placed it, so the placement is still selectable and movable.
@@ -481,7 +481,7 @@ function assemble(st, fileName) {
     kind: !e.prims.length && !e.models.length && e.cps.length
       ? 'pass' : classify(e.tags),
     // start/finish gate: either built from a StartFinish library macro/include
-    // (tag), or an editor-emitted/converted gate wearing the red start banner
+    // (tag), or an editor-emitted/imported gate wearing the red start banner
     // material (GateStartBannerMaterial) — those carry no macro name.
     isStart: [...e.tags].some(t => /StartFinish/.test(t))
       || e.prims.some(p => /Start(Finish|Banner)/.test(p.material || '')),
