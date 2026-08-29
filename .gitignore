@@ -1,8 +1,14 @@
 # Conversion code lives on disk so the editor's .trk import keeps working
 # locally, but is not published. Do not remove the files — the editor needs
 # them at runtime for VD -> MRSIM import.
-/convert/
+/convert/*
 /convert.js
+# convert/credit.js and convert/neon.js aren't VD-conversion — the first
+# writes the "created by X" export header, the second holds MRSIM's LED
+# PBREmissive material and the neon-shape palette. The editor imports both
+# on every page load, so they have to ship.
+!/convert/credit.js
+!/convert/neon.js
 
 # MRSIM object meshes/textures decoded from MRSIM.dkb are the game
 # developer's copyrighted assets. Never redistributed. The published
