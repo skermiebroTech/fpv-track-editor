@@ -2947,21 +2947,14 @@ const MACRO_SHIFTS = {
 };
 
 // ---------------------------------------------------------------------------
-// TRACK OBJECTS — the things the VelociDrone importer emits, as placeable
-// palette entries. MRSIM's own library has no MultiGP hurdle, no feather flag
-// with a one-sided pass, no true-size race gate and no bare window-pane
-// checkpoint, so hand-fixing a imported track used to mean editing XML. These
-// are built from the same component schema as the object builder (`parts` +
-// optional `pass`), so placement, hover preview, placement ghost, duplicate,
-// recolour and undo all work on them for free — and they carry the importer's
-// own material names, so a placed object matches the imported ones beside it.
-//
-// Sizes are the importer's, for VD's standard prefabs: MGPHurdle 3.04 x 1.52
-// panel, DefaultMGP4MFlag 5.6 m pole with the cloth on one side and the
-// trigger wall running out of the OTHER (pole) side, and the 3.2 m race gate
-// whose true aperture is 2.96 x 2.46.
+// DEMO OBJECTS — extra placeable entries built from primitives instead of
+// library includes: a 3 m race gate frame, a 4 m feather flag with a
+// one-sided pass, a hurdle panel, checkpoint window panes (upright + dive),
+// a net panel and a stretch block. Built from the same component schema as
+// the object builder (`parts` + optional `pass`) so placement, hover preview,
+// placement ghost, duplicate, recolour and undo all work on them for free.
 // ---------------------------------------------------------------------------
-const GATE_AP_W = 2.96, GATE_AP_H = 2.46;   // true VD race-gate opening
+const GATE_AP_W = 2.96, GATE_AP_H = 2.46;   // 3 m race-gate opening
 const gateFrameParts = banner => [
   { suffix: '_postL', shape: 'cyl', pos: [-GATE_AP_W / 2 - 0.06, 0, (GATE_AP_H + 0.15) / 2],
     dims: [0.06, GATE_AP_H + 0.15], material: 'GatePostMaterial' },
@@ -2974,12 +2967,12 @@ const gatePass = {
   pos: [0, 0, GATE_AP_H / 2], dims: [GATE_AP_W, 0.3, GATE_AP_H],
   ref: { pos: [0, 0, GATE_AP_H / 2], rot: [0, 0, 0] },
 };
-const TRACK_OBJECTS = [
-  { id: 'vdGate', label: 'VD race gate (3.2 m)', cp: 'pass',
+const DEMO_OBJECTS = [
+  { id: 'gateFrame3', label: 'race gate (3 m)', cp: 'pass',
     parts: gateFrameParts('GateBannerMaterial'), pass: gatePass },
-  { id: 'vdGateSF', label: 'VD start/finish gate', cp: 'pass',
+  { id: 'sfFrame3', label: 'start/finish gate (3 m)', cp: 'pass',
     parts: gateFrameParts('GateStartBannerMaterial'), pass: gatePass },
-  { id: 'vdFlag', label: 'VD 4 m flag + pass', cp: 'pass',
+  { id: 'flag4', label: '4 m flag + pass', cp: 'pass',
     parts: [
       { suffix: '_pole', shape: 'cyl', pos: [0, 0, 2.8], dims: [0.045, 5.6],
         material: 'FlagRiserMaterial' },
@@ -2990,20 +2983,20 @@ const TRACK_OBJECTS = [
     // the trigger runs out of the POLE side (+X), away from the fabric
     pass: { pos: [5.5, 0, 3.35], dims: [12.5, 0.01, 7.4],
       ref: { pos: [0, 0, 2.6], rot: [0, 0, 0] } } },
-  { id: 'vdHurdle', label: 'MGP hurdle panel', cp: null,
+  { id: 'hurdle3', label: 'hurdle panel', cp: null,
     parts: [{ shape: 'box', pos: [0, 0, 0.76], dims: [3.04, 0.02, 1.52],
       material: 'HurdlePanelMaterial' }] },
-  { id: 'vdPane', label: 'checkpoint pane (upright)', cp: 'pass', parts: [],
+  { id: 'cpPane', label: 'checkpoint pane (upright)', cp: 'pass', parts: [],
     pass: { pos: [0, 0, 3.1], dims: [12, 0.3, 6],
       ref: { pos: [0, 0, 1.5], rot: [0, 0, 0] } } },
-  { id: 'vdPaneFlat', label: 'checkpoint pane (dive)', cp: 'pass', parts: [],
+  { id: 'cpPaneDive', label: 'checkpoint pane (dive)', cp: 'pass', parts: [],
     // horizontal pane crossed downwards — the ring points at the floor
     pass: { pos: [0, 0, 2.7], dims: [8, 8, 0.3],
       ref: { pos: [0, 0, 2.7], rot: [0, -90, 0] } } },
-  { id: 'vdNet', label: 'net panel', cp: null,
+  { id: 'netPanel', label: 'net panel', cp: null,
     parts: [{ shape: 'box', pos: [0, 0, 1], dims: [4, 0.1, 2],
       material: 'NetPanelMaterial' }] },
-  { id: 'vdBlock', label: 'stretch block', cp: null,
+  { id: 'stretchBlock', label: 'stretch block', cp: null,
     parts: [{ shape: 'box', pos: [0, 0, 1], dims: [2, 2, 2],
       material: 'BlockWhiteMaterial' }] },
 ];
@@ -3083,7 +3076,7 @@ function customDefs() {
 function allPalette() {
   const custom = customDefs();
   const seen = new Set(custom.map(c => c.id));
-  return [...PALETTE, ...[...TRACK_OBJECTS, ...NEON_OBJECTS].filter(d => !seen.has(d.id)), ...custom];
+  return [...PALETTE, ...[...DEMO_OBJECTS, ...NEON_OBJECTS].filter(d => !seen.has(d.id)), ...custom];
 }
 
 // ---- DOM building blocks ---------------------------------------------------
@@ -4194,18 +4187,8 @@ function renderPalette() {
   // shadowing is by the FULL custom set, not the filtered one — a search must
   // never resurrect a built-in that a custom component has replaced
   const shadowed = new Set(allCustom.map(c => c.id));
-  const track = TRACK_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
-  if (track.length) {
-    const div = document.createElement('div');
-    div.className = 'palDivide'; div.textContent = 'track objects (VD)';
-    pal.appendChild(div);
-    track.forEach(def => {
-      const b = mkBtn(def);
-      b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
-        ' · what the VD importer emits';
-      pal.appendChild(b);
-    });
-  }
+  const demo = DEMO_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
+  demo.forEach(def => pal.appendChild(mkBtn(def)));
   const neon = NEON_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
   if (neon.length) {
     const div = document.createElement('div');
