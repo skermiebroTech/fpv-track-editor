@@ -377,6 +377,8 @@
   /* ---- palette custom section ---- */
   #editPanel .pal button.custom { border-color: #3f5330; }
   #editPanel .pal button.custom:hover { border-color: var(--edit-text); }
+  #editPanel .pal button.community { border-color: #4a3f6b; }
+  #editPanel .pal button.community:hover { border-color: var(--edit-text); }
   #editPanel .palDivide { grid-column: 1 / -1; display: flex; align-items: center;
     gap: 7px; color: var(--faint); font-size: 10px; margin: 8px 0 2px;
     text-transform: uppercase; letter-spacing: .07em; }
@@ -771,6 +773,8 @@
     <div class="bList" id="bList"></div>
     <div class="bForm" id="bForm">
       <div class="fRow"><label>name</label><input type="text" id="bName" placeholder="my object" maxlength="40"></div>
+      <div class="fRow"><label title="credited on hover and written into every export — remembered for your next object">author</label>
+        <input type="text" id="bAuthor" placeholder="your name or GitHub handle" maxlength="40"></div>
       <div class="cpRow"><input type="checkbox" id="bCp">
         <label for="bCp" style="width:auto;color:#b7e07a">race checkpoint (joins the lap when placed)</label></div>
       <div id="bPassRow" class="fRow" style="display:none">
@@ -3031,14 +3035,18 @@ const NEON_OBJECTS = [
 // CUSTOM COMPONENTS — user-built track objects. A component is a small entity
 // subtree (the same shape buildCustomGate emits): a list of primitive `parts`
 // (box/cylinder with an offset, rotation, size and colour) plus an optional
-// `pass` checkpoint trigger. They live in two places and both feed the palette:
+// `pass` checkpoint trigger. They live in three places and all feed the palette:
 //   · localStorage  — this browser's own objects, editable in the builder
 //   · components.json — repo-shared objects (read-only here), so a contributor
 //     can "export all" and drop the file in the repo for everyone.
+//   · community/*.json — objects contributed by pull request (read-only here).
+//     community/index.json lists the files; a GitHub Action regenerates it on
+//     every merge, so a merged file shows up in the palette with no code change.
 // ---------------------------------------------------------------------------
 const CUSTOM_STORE_KEY = 'mrsim.customComponents';
-let CUSTOM_LOCAL = [];    // this browser's components (editable)
-let CUSTOM_SHARED = [];   // components.json bundled in the repo (read-only)
+let CUSTOM_LOCAL = [];      // this browser's components (editable)
+let CUSTOM_SHARED = [];     // components.json bundled in the repo (read-only)
+let CUSTOM_COMMUNITY = [];  // community/*.json contributed by PR (read-only)
 
 function loadLocalComponents() {
   try {
@@ -3059,16 +3067,48 @@ async function loadSharedComponents() {
     if (Array.isArray(v)) CUSTOM_SHARED = v.filter(isComponent).map(c => ({ ...c, shared: true }));
   } catch { /* no repo bundle — fine */ }
 }
+// A community file is whatever the builder exports: one object, an array of
+// objects, or `{ author, objects: [...] }`. A file-level `author` is the
+// default for every object in it; an object's own `author` wins.
+function communityObjects(file, v) {
+  const author = typeof v?.author === 'string' ? v.author : '';
+  const list = Array.isArray(v) ? v : Array.isArray(v?.objects) ? v.objects : [v];
+  return list.filter(isComponent).map(c => ({ ...c, shared: true, community: true,
+    author: typeof c.author === 'string' && c.author ? c.author : author, source: file }));
+}
+async function loadCommunityComponents() {
+  let files = [];
+  try {
+    const r = await fetch('community/index.json');
+    if (!r.ok) return;
+    const v = await r.json();
+    files = (Array.isArray(v) ? v : []).filter(f => typeof f === 'string' && /^[\w.-]+\.json$/.test(f));
+  } catch { return; /* no community index — fine */ }
+  // one bad file must not hide the rest — each fetch/parse fails on its own
+  const loaded = await Promise.all(files.map(async f => {
+    try {
+      const r = await fetch('community/' + f);
+      return r.ok ? communityObjects(f, await r.json()) : [];
+    } catch (e) { console.warn(`community/${f}: ${e.message}`); return []; }
+  }));
+  // an id that clashes with an earlier community file loses — first file wins
+  const seen = new Set();
+  CUSTOM_COMMUNITY = loaded.flat().filter(c => !seen.has(c.id) && seen.add(c.id));
+}
 const isComponent = c => c && typeof c === 'object' && Array.isArray(c.parts);
 
-// palette id -> component (local wins over a same-id shared one)
+// palette id -> component (local wins over a same-id shared one, which wins
+// over a same-id community one)
 function customById(id) {
-  return CUSTOM_LOCAL.find(c => c.id === id) || CUSTOM_SHARED.find(c => c.id === id) || null;
+  return CUSTOM_LOCAL.find(c => c.id === id) || CUSTOM_SHARED.find(c => c.id === id) ||
+    CUSTOM_COMMUNITY.find(c => c.id === id) || null;
 }
-// every custom component as a palette def, deduped by id (local shadows shared)
+// every custom component as a palette def, deduped by id (local shadows
+// shared, both shadow community)
 function customDefs() {
   const seen = new Set(CUSTOM_LOCAL.map(c => c.id));
-  return [...CUSTOM_LOCAL, ...CUSTOM_SHARED.filter(c => !seen.has(c.id))];
+  const shared = CUSTOM_SHARED.filter(c => !seen.has(c.id) && seen.add(c.id));
+  return [...CUSTOM_LOCAL, ...shared, ...CUSTOM_COMMUNITY.filter(c => !seen.has(c.id))];
 }
 // built-ins + importer track objects + custom — the full placeable set
 // (palette, place() hook, arm). A user component with the same id shadows a
@@ -4183,7 +4223,6 @@ function renderPalette() {
   const builtin = PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id) && palMatches(def));
   builtin.forEach(def => pal.appendChild(mkBtn(def)));
   const allCustom = customDefs();
-  const custom = allCustom.filter(palMatches);
   // shadowing is by the FULL custom set, not the filtered one — a search must
   // never resurrect a built-in that a custom component has replaced
   const shadowed = new Set(allCustom.map(c => c.id));
@@ -4201,20 +4240,27 @@ function renderPalette() {
       pal.appendChild(b);
     });
   }
-  if (custom.length) {
+  // one section for your own + repo-shared objects, another for community PRs
+  const custom = allCustom.filter(c => !c.community && palMatches(c));
+  const community = allCustom.filter(c => c.community && palMatches(c));
+  const customSection = (title, defs, cls, origin) => {
+    if (!defs.length) return;
     const div = document.createElement('div');
-    div.className = 'palDivide'; div.textContent = 'custom';
+    div.className = 'palDivide'; div.textContent = title;
     pal.appendChild(div);
-    custom.forEach(def => {
+    defs.forEach(def => {
       const b = mkBtn(def);
-      b.classList.add('custom');
+      b.classList.add(cls);
       b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
-        (def.shared ? ' · repo-shared' : ' · yours') + ' · right-click to edit in builder';
+        ' · ' + origin(def) + ' · right-click to edit in builder';
       b.oncontextmenu = e => { e.preventDefault(); openBuilder(def.id); };
       pal.appendChild(b);
     });
-  }
-  if (palFilter && !builtin.length && !track.length && !neon.length && !custom.length) {
+  };
+  const by = def => def.author ? ' · by ' + def.author : '';
+  customSection('custom', custom, 'custom', def => (def.shared ? 'repo-shared' : 'yours') + by(def));
+  customSection('community', community, 'community', def => 'community' + by(def) + ` (${def.source})`);
+  if (palFilter && !builtin.length && !demo.length && !neon.length && !custom.length && !community.length) {
     const none = document.createElement('div');
     none.className = 'palNone';
     none.textContent = `no objects match “${palFilter}”`;
@@ -4265,6 +4311,7 @@ palAllBtn.onclick = async () => {
 loadLocalComponents();
 renderPalette();
 loadSharedComponents().then(renderPalette);
+loadCommunityComponents().then(renderPalette);
 
 // ---------------------------------------------------------------------------
 // PALETTE HOVER PREVIEW — a live 3-D thumbnail of the object under the cursor.
@@ -4393,7 +4440,7 @@ async function showPreview(def, btn) {
     PV.camera.position.copy(new THREE.Vector3(0.55, 0.5, 1).normalize().multiplyScalar(dist));
     PV.camera.lookAt(0, 0, 0);
   }
-  PV.cap.textContent = def.label;
+  PV.cap.textContent = def.label + (def.author ? ' · by ' + def.author : '');
   PV.el.classList.toggle('empty', !PV.group);
   positionPreview(btn);
   PV.el.classList.add('show');
@@ -4459,7 +4506,13 @@ const defaultRef = pass => ({ pos: (pass?.pos || [0, 0, 1.25]).slice(0, 3), rot:
 const withRef = pass => ({ ...pass, ref: pass.ref
   ? { pos: (pass.ref.pos || pass.pos || [0, 0, 1.25]).slice(0, 3), rot: (pass.ref.rot || [0, 0, 0]).slice(0, 3) }
   : defaultRef(pass) });
-const blankComponent = () => ({ label: '', cp: null, parts: [],
+// the author name is typed once and remembered, so every new object and every
+// export carries it without retyping
+const AUTHOR_KEY = 'mrsim.author';
+const cleanAuthor = v => (typeof v === 'string' ? v.trim().slice(0, 40) : '');
+const rememberedAuthor = () => { try { return cleanAuthor(localStorage.getItem(AUTHOR_KEY)); } catch { return ''; } };
+const rememberAuthor = v => { try { localStorage.setItem(AUTHOR_KEY, cleanAuthor(v)); } catch { /* full — fine */ } };
+const blankComponent = () => ({ label: '', author: rememberedAuthor(), cp: null, parts: [],
   pass: { pos: [0, 0, 1.25], dims: [2.5, 0.3, 2.5], ref: { pos: [0, 0, 1.25], rot: [0, 0, 0] } } });
 // every shape a builder part can be, with how many dims it carries. 'mesh' is
 // an imported OBJ: dims are per-axis scale factors and the part carries its own
@@ -4504,6 +4557,8 @@ function cleanComponent(def, id) {
     return out;
   });
   const out = { id, label: (def.label || 'object').slice(0, 40), cp: def.cp === 'pass' ? 'pass' : null, parts };
+  const author = cleanAuthor(def.author);
+  if (author) out.author = author;
   if (out.cp) {
     const pass = withRef(def.pass || {});
     out.pass = { pos: (pass.pos || [0, 0, 1.25]).slice(0, 3).map(r3),
@@ -4514,7 +4569,7 @@ function cleanComponent(def, id) {
 }
 function uniqueComponentId(label) {
   const slug = (label || 'object').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'object';
-  const taken = new Set([...PALETTE, ...CUSTOM_LOCAL, ...CUSTOM_SHARED].map(c => c.id));
+  const taken = new Set([...PALETTE, ...CUSTOM_LOCAL, ...CUSTOM_SHARED, ...CUSTOM_COMMUNITY].map(c => c.id));
   let id = 'custom_' + slug, n = 2;
   while (taken.has(id)) id = `custom_${slug}-${n++}`;
   return id;
@@ -4644,28 +4699,35 @@ function renderBuilderList() {
   box.innerHTML = '';
   const nb = document.createElement('button'); nb.className = 'new'; nb.textContent = '＋ new object';
   nb.onclick = () => openBuilder(null); box.appendChild(nb);
-  const mkItem = (c, shared) => {
+  const mkItem = (c, tag) => {
     const b = document.createElement('button');
     b.textContent = c.label || c.id;
-    if (shared) { const s = document.createElement('span'); s.className = 'shared'; s.textContent = 'repo'; b.appendChild(s); }
+    if (tag) { const s = document.createElement('span'); s.className = 'shared'; s.textContent = tag; b.appendChild(s); }
+    if (c.author) b.title = 'by ' + c.author;
     if (builderState && builderState.editingId === c.id) b.classList.add('on');
     b.onclick = () => openBuilder(c.id);
     box.appendChild(b);
   };
   if (CUSTOM_LOCAL.length) {
     const h = document.createElement('h3'); h.textContent = 'your objects'; box.appendChild(h);
-    CUSTOM_LOCAL.forEach(c => mkItem(c, false));
+    CUSTOM_LOCAL.forEach(c => mkItem(c, ''));
   }
   const shadowed = new Set(CUSTOM_LOCAL.map(c => c.id));
-  const shared = CUSTOM_SHARED.filter(c => !shadowed.has(c.id));
+  const shared = CUSTOM_SHARED.filter(c => !shadowed.has(c.id) && shadowed.add(c.id));
   if (shared.length) {
     const h = document.createElement('h3'); h.textContent = 'repo-shared'; box.appendChild(h);
-    shared.forEach(c => mkItem(c, true));
+    shared.forEach(c => mkItem(c, 'repo'));
+  }
+  const community = CUSTOM_COMMUNITY.filter(c => !shadowed.has(c.id));
+  if (community.length) {
+    const h = document.createElement('h3'); h.textContent = 'community'; box.appendChild(h);
+    community.forEach(c => mkItem(c, c.author || 'community'));
   }
 }
 function syncBuilderForm() {
   const d = builderState.def;
   document.getElementById('bName').value = d.label || '';
+  document.getElementById('bAuthor').value = d.author || '';
   const isCp = d.cp === 'pass';
   document.getElementById('bCp').checked = isCp;
   document.getElementById('bPassRow').style.display = isCp ? 'flex' : 'none';
@@ -4822,6 +4884,8 @@ function saveComponent() {
   if (!label) return bFlash('give the object a name first', true);
   if (!builderState.def.parts.length) return bFlash('add at least one part first', true);
   builderState.def.label = label;
+  builderState.def.author = cleanAuthor(document.getElementById('bAuthor').value);
+  if (builderState.def.author) rememberAuthor(builderState.def.author);
   const id = builderState.editingId || uniqueComponentId(label);
   const ok = upsertComponent(cleanComponent(builderState.def, id));
   builderState.editingId = id;
@@ -5011,6 +5075,8 @@ document.getElementById('bObjFile').onchange = async e => {
   catch (err) { bFlash('OBJ import failed: ' + err.message, true); }
 };
 document.getElementById('bName').addEventListener('input', e => { if (builderState) builderState.def.label = e.target.value; });
+document.getElementById('bAuthor').addEventListener('input', e => { if (builderState) builderState.def.author = e.target.value; });
+document.getElementById('bAuthor').addEventListener('change', e => rememberAuthor(e.target.value));
 document.getElementById('bCp').addEventListener('change', e => {
   if (!builderState) return;
   builderState.def.cp = e.target.checked ? 'pass' : null;
@@ -5088,13 +5154,19 @@ document.getElementById('bExportOne').onclick = () => {
   const label = document.getElementById('bName').value.trim() || 'object';
   if (!builderState.def.parts.length) return bFlash('nothing to export — add parts', true);
   const id = builderState.editingId || uniqueComponentId(label);
-  downloadJson(id + '.component.json', cleanComponent({ ...builderState.def, label }, id));
-  bFlash('exported this object as JSON ✓');
+  const author = cleanAuthor(document.getElementById('bAuthor').value);
+  if (author) rememberAuthor(author);
+  downloadJson(id + '.component.json', cleanComponent({ ...builderState.def, label, author }, id));
+  bFlash('exported this object as JSON ✓' + (author ? ` · by ${author}` : ''));
 };
+// Objects carry their own author; the file-level author (the remembered name)
+// is the default for any object that has none — the shape community/ accepts.
 document.getElementById('bExportAll').onclick = () => {
   if (!CUSTOM_LOCAL.length) return bFlash('no saved objects yet — save one first', true);
-  downloadJson('components.json', CUSTOM_LOCAL.map(c => cleanComponent(c, c.id)));
-  bFlash(`exported ${CUSTOM_LOCAL.length} object(s) → drop components.json in the repo`);
+  const objects = CUSTOM_LOCAL.map(c => cleanComponent(c, c.id));
+  const author = rememberedAuthor() || cleanAuthor(document.getElementById('bAuthor').value);
+  downloadJson('components.json', author ? { author, objects } : objects);
+  bFlash(`exported ${CUSTOM_LOCAL.length} object(s)${author ? ` by ${author}` : ''} → share it via community/ (see README)`);
 };
 document.getElementById('bImport').onclick = () => document.getElementById('bImportFile').click();
 document.getElementById('bImportFile').onchange = async e => {
@@ -5107,9 +5179,9 @@ document.getElementById('bDelete').onclick = () => {
   if (!id) { openBuilder(null); return bFlash('cleared'); }
   const i = CUSTOM_LOCAL.findIndex(c => c.id === id);
   if (i >= 0) { CUSTOM_LOCAL.splice(i, 1); saveLocalComponents(); PV.cache?.delete(id); }
-  const stillShared = CUSTOM_SHARED.some(c => c.id === id);
+  const stillShared = CUSTOM_SHARED.some(c => c.id === id) || CUSTOM_COMMUNITY.some(c => c.id === id);
   renderPalette(); openBuilder(null);
-  bFlash(stillShared ? 'removed your copy — the repo-shared one remains' : 'deleted');
+  bFlash(stillShared ? 'removed your copy — the shared one remains' : 'deleted');
 };
 document.getElementById('bClose').onclick = closeBuilder;
 document.getElementById('builder').addEventListener('mousedown', e => {
@@ -5123,7 +5195,8 @@ window.__build = {
   close: () => { closeBuilder(); return true; },
   isOpen: () => builderOpen,
   list: () => customDefs().map(c => ({ id: c.id, label: c.label, cp: c.cp || null,
-    parts: (c.parts || []).length, shared: !!c.shared })),
+    parts: (c.parts || []).length, shared: !!c.shared, community: !!c.community,
+    author: c.author || null, source: c.source || null })),
   get: id => customById(id),
   addPart: shape => { if (builderState) { addPart(shape); return builderState.def.parts.length; } return 0; },
   importObj: (text, name) => { try { return importObjText(text, name || 'import.obj'); }

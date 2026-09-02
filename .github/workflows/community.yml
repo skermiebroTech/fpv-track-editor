@@ -1,0 +1,46 @@
+# Community object library.
+#  · pull request touching community/ → validate every file (the PR shows a red
+#    cross with the reason if something is wrong)
+#  · merge to main touching community/ → regenerate community/index.json and
+#    commit it, so the new object appears in the editor's palette automatically
+name: community objects
+
+on:
+  pull_request:
+    paths: ['community/**', 'components.json', 'scripts/build-community-index.mjs']
+  push:
+    branches: [main]
+    paths: ['community/**', 'components.json', 'scripts/build-community-index.mjs']
+
+jobs:
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: validate community objects
+        run: node scripts/build-community-index.mjs
+
+  index:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: rebuild community/index.json
+        run: node scripts/build-community-index.mjs
+      - name: commit the index if it changed
+        run: |
+          if git diff --quiet -- community/index.json; then
+            echo "index unchanged"; exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add community/index.json
+          git commit -m 'Rebuild community/index.json'
+          git push
