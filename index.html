@@ -140,6 +140,7 @@
     overflow: hidden; text-overflow: ellipsis; }
   #newPanel .lcRow input { flex: 0 0 auto; width: 72px; box-sizing: border-box; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 3px 6px; font: inherit; }
+  #newPanel .lcRow input:disabled { opacity: .5; }
   #newPanel .lcRow input:focus { outline: none; border-color: var(--accent); }
   #newPanel button { width: 100%; margin-top: 4px; background: var(--surface-2);
     color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
@@ -610,8 +611,12 @@
   <button id="newBlank" title="world, launch stand and an empty lap">blank track</button>
   <h3>lens calibration</h3>
   <p>A flat wall in front of the spawn with a door outline, two tape squares and a
-    numbered height ruler, for comparing goggle DVR frames with MRSIM. All sizes in metres.</p>
+    numbered height ruler, for comparing goggle DVR frames with MRSIM. Sizes in metres unless marked cm.</p>
   <div class="lcRow"><label for="lcDistance">wall distance</label><input id="lcDistance" type="number" step="0.1" min="0.1"></div>
+  <div class="lcRow"><label for="lcCameraH" title="camera elevation above the ground that you want; empty = use the platform height below">camera height (cm)</label><input id="lcCameraH" type="number" step="0.5" min="0" placeholder="off"></div>
+  <div class="lcRow"><label for="lcCameraOnStand" title="sim camera height with the stand on the ground: set Camera Angle 0, make a track with platform 0, read the ruler at the image centre">camera on stand (cm)</label><input id="lcCameraOnStand" type="number" step="0.5" min="0" placeholder="measure"></div>
+  <p id="lcCamHint">Measure once per frame: set Camera Angle 0, make a track with no camera
+    height, and read the ruler at the image centre.</p>
   <div class="lcRow"><label for="lcPlatform" title="extra height under the launch stand; 0 = stand on the ground">platform height</label><input id="lcPlatform" type="number" step="0.05" min="0"></div>
   <div class="lcRow"><label for="lcDoorW">door width</label><input id="lcDoorW" type="number" step="0.01" min="0.05"></div>
   <div class="lcRow"><label for="lcDoorH">door height</label><input id="lcDoorH" type="number" step="0.01" min="0.05"></div>
@@ -923,7 +928,7 @@ import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // importer so a placed neon ring and a imported one are the same object
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
-import { lensCalibrationXml, LENS_CAL_DEFAULTS } from './lib/lens-cal.js';
+import { lensCalibrationXml, lensCalPlatform, LENS_CAL_DEFAULTS } from './lib/lens-cal.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
@@ -5673,6 +5678,25 @@ const newBtn = document.getElementById('btnNew'), newPanel = document.getElement
 const LC_FIELDS = { distance: 'lcDistance', platform: 'lcPlatform', doorW: 'lcDoorW', doorH: 'lcDoorH',
   smallS: 'lcSmallS', largeS: 'lcLargeS', squareC: 'lcSquareC', tape: 'lcTape' };
 for (const [k, id] of Object.entries(LC_FIELDS)) document.getElementById(id).value = LENS_CAL_DEFAULTS[k];
+// camera elevation is entered in cm; when set, it decides the platform height
+const lcCam = document.getElementById('lcCameraH'), lcStand = document.getElementById('lcCameraOnStand');
+const lcPlat = document.getElementById('lcPlatform'), lcHint = document.getElementById('lcCamHint');
+const LC_HINT = lcHint.textContent;
+function lcCameraOpts() {
+  const h = parseFloat(lcCam.value), st = parseFloat(lcStand.value);
+  return h > 0 ? { cameraH: h / 100, cameraOnStand: st > 0 ? st / 100 : 0 } : {};
+}
+function lcSyncCamera() {
+  const c = lcCameraOpts();
+  lcPlat.disabled = !!c.cameraH;
+  if (!c.cameraH) { lcHint.textContent = LC_HINT; return; }
+  try {
+    const P = lensCalPlatform({ ...LENS_CAL_DEFAULTS, ...c });
+    lcPlat.value = +P.toFixed(4);
+    lcHint.textContent = `platform under the stand: ${+(P * 100).toFixed(1)} cm`;
+  } catch (err) { lcHint.textContent = err.message; }
+}
+lcCam.oninput = lcStand.oninput = lcSyncCamera;
 function setNewPanel(open) {
   if (open) newPanel.style.left = Math.round(newBtn.getBoundingClientRect().left) + 'px';
   newPanel.classList.toggle('hidden', !open);
@@ -5693,6 +5717,7 @@ document.getElementById('lcCreate').onclick = async () => {
   const errEl2 = document.getElementById('lcErr');
   const opts = {};
   for (const [k, id] of Object.entries(LC_FIELDS)) opts[k] = document.getElementById(id).value;
+  Object.assign(opts, lcCameraOpts());
   try {
     errEl2.textContent = '';
     if (await newLensCalTrack(opts)) setNewPanel(false);
