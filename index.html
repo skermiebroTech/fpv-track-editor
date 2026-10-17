@@ -616,7 +616,7 @@
   <p>A flat wall in front of the spawn with a door outline, two tape squares and a
     numbered height ruler, for comparing goggle DVR frames with MRSIM. Sizes in metres unless marked cm.</p>
   <div class="lcRow"><label for="lcDistance">wall distance</label><input id="lcDistance" type="number" step="0.1" min="0.1"></div>
-  <div class="lcRow"><label for="lcFrame" title="the frame selected in MRSIM; fills in the camera height on the stand from the game files (July 2026)">sim frame</label><select id="lcFrame"></select></div>
+  <div class="lcRow"><label for="lcFrame" title="the frame selected in MRSIM; fills in the camera height on the stand from the game files (checked against the Oct 2026 build)">sim frame</label><select id="lcFrame"></select></div>
   <div class="lcRow"><label for="lcLens">sim lens</label><select id="lcLens"></select></div>
   <div class="lcRow"><label for="lcAngle" title="MRSIM Camera Angle (uptilt). Use 0 to read the ruler.">camera angle (°)</label><input id="lcAngle" type="number" step="1" min="0" max="60" value="0"></div>
   <div class="lcRow"><label for="lcCameraH" title="camera elevation above the ground that you want; empty = use the platform height below">camera height (cm)</label><input id="lcCameraH" type="number" step="0.5" min="0" placeholder="off"></div>
@@ -5725,7 +5725,7 @@ function lcSyncFrame() {
     const d = parseFloat(document.getElementById('lcDistance').value) || 0;
     if (!lcCameraOpts().cameraH) lcHint.textContent = `lens ${lcStand.value} cm above the ground on the stand`;
     lcHint.textContent += ` · ${+(off.forward * 100).toFixed(2)} cm forward of the spawn, ` +
-      `${+((d - off.forward) * 100).toFixed(2)} cm from the wall (game files, July 2026)`;
+      `${+((d - off.forward) * 100).toFixed(2)} cm from the wall (game files + in-game measurement, Oct 2026)`;
   }
 }
 lcFrame.onchange = lcLens.onchange = lcAngle.oninput = lcSyncFrame;
