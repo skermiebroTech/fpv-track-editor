@@ -23,6 +23,11 @@ the scene as an MRSIM `.xml` ready to drop into the game.
   manage the start/finish, insert dive rings
 - Ctrl-click multi-select with group move / rotate / delete / duplicate
 - Environment picker: Empty Grass World, Baylands Park, Hardesty BMX
+- **Lens calibration generator** (new → lens calibration) — a flat wall at a
+  set distance from the spawn with a door outline, two tape squares and a
+  numbered height ruler, for comparing goggle DVR frames with MRSIM
+  screenshots. Sizes are editable in the panel and the output is fully
+  commented (`lib/lens-cal.js`)
 - **Template images** — pin reference photos or maps to the ground plane
   (stored locally, never exported)
 - **Headless self-verify harness** exposed on `window.__mrsim` and

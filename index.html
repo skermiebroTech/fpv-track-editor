@@ -93,7 +93,7 @@
 
   /* every floating panel shares one surface, so they read as one system and a
      change of depth or blur happens in a single place */
-  #envPanel, #diag, #editPanel, #tplPanel {
+  #envPanel, #diag, #editPanel, #tplPanel, #newPanel {
     position: fixed; top: 44px; z-index: 5;
     background: var(--surface);   /* fallback before color-mix */
     background: color-mix(in srgb, var(--surface) 94%, transparent);
@@ -127,6 +127,26 @@
     padding: 6px 9px; font: inherit; cursor: pointer; }
   #envPanel .envReset:hover { background: var(--surface-3); border-color: var(--accent);
     color: var(--text); }
+
+  /* ---- new-track popover: blank track, or a generated lens-calibration wall ---- */
+  #newPanel { width: 268px; z-index: 6; max-height: calc(100vh - 56px); overflow-y: auto; }
+  #newPanel.hidden { display: none; }
+  #newPanel h3 { font-size: 11px; margin: 10px 0 6px; color: var(--dim); font-weight: 500;
+    text-transform: uppercase; letter-spacing: .07em; }
+  #newPanel h3:first-child { margin-top: 0; }
+  #newPanel p { margin: 0 0 8px; color: var(--faint); font-size: 11px; line-height: 1.45; }
+  #newPanel .lcRow { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  #newPanel .lcRow label { flex: 1 1 auto; min-width: 0; color: var(--text); white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis; }
+  #newPanel .lcRow input { flex: 0 0 auto; width: 72px; box-sizing: border-box; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 3px 6px; font: inherit; }
+  #newPanel .lcRow input:focus { outline: none; border-color: var(--accent); }
+  #newPanel button { width: 100%; margin-top: 4px; background: var(--surface-2);
+    color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    padding: 6px 9px; font: inherit; cursor: pointer; }
+  #newPanel button:hover { background: var(--surface-3); border-color: var(--accent); }
+  #newPanel .lcErr { color: var(--warn); font-size: 11px; margin-top: 6px; }
+  #newPanel .lcErr:empty { display: none; }
 
   /* ---- template-image panel (editor-only reference photos / maps) ----
      Kept out of the exported .xml — images live in localStorage keyed by track
@@ -562,7 +582,7 @@
   <span class="title">FPV Track Editor</span>
   <select id="track"></select>
   <label class="file">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
-  <button id="btnNew" title="start a blank track">new</button>
+  <button id="btnNew" title="start a blank track, or generate a lens calibration track">new</button>
   <button id="btnTop" title="snap the camera directly overhead">top</button>
   <button id="btnProj" title="perspective — click for orthographic / isometric">perspective</button>
   <select id="ctrlScheme" title="camera control scheme — matches popular 3D/CAD tools"></select>
@@ -584,6 +604,23 @@
     <p id="migrateText"></p>
   </div>
   <button id="migrateOk" title="hide this notice">dismiss</button>
+</div>
+<div id="newPanel" class="hidden">
+  <h3>new track</h3>
+  <button id="newBlank" title="world, launch stand and an empty lap">blank track</button>
+  <h3>lens calibration</h3>
+  <p>A flat wall in front of the spawn with a door outline, two tape squares and a
+    numbered height ruler, for comparing goggle DVR frames with MRSIM. All sizes in metres.</p>
+  <div class="lcRow"><label for="lcDistance">wall distance</label><input id="lcDistance" type="number" step="0.1" min="0.1"></div>
+  <div class="lcRow"><label for="lcPlatform" title="extra height under the launch stand; 0 = stand on the ground">platform height</label><input id="lcPlatform" type="number" step="0.05" min="0"></div>
+  <div class="lcRow"><label for="lcDoorW">door width</label><input id="lcDoorW" type="number" step="0.01" min="0.05"></div>
+  <div class="lcRow"><label for="lcDoorH">door height</label><input id="lcDoorH" type="number" step="0.01" min="0.05"></div>
+  <div class="lcRow"><label for="lcSmallS">small square side</label><input id="lcSmallS" type="number" step="0.1" min="0.05"></div>
+  <div class="lcRow"><label for="lcLargeS">large square side</label><input id="lcLargeS" type="number" step="0.1" min="0.05"></div>
+  <div class="lcRow"><label for="lcSquareC" title="centre height of both squares">square centre</label><input id="lcSquareC" type="number" step="0.05" min="0"></div>
+  <div class="lcRow"><label for="lcTape">tape width</label><input id="lcTape" type="number" step="0.001" min="0.001"></div>
+  <button id="lcCreate" title="load the generated wall as a new track">create calibration track</button>
+  <div class="lcErr" id="lcErr"></div>
 </div>
 <div id="envPanel" class="hidden">
   <h3>environment</h3>
@@ -886,6 +923,7 @@ import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // importer so a placed neon ring and a imported one are the same object
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
+import { lensCalibrationXml, LENS_CAL_DEFAULTS } from './lib/lens-cal.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
@@ -5523,7 +5561,8 @@ window.__edit = {
     pushUndoOps(ops); editState.dirty = true; return rebuildFromDoc(); },
   mirror: axis => mirrorTrack(axis),        // 'x' | 'y' | 'z' — mirror whole track
   shiftZ: dz => shiftTrackZ(dz),            // translate every object by dz metres in z
-  newTrack: () => document.getElementById('btnNew').onclick(),
+  newTrack: () => newBlankTrack(),
+  newLensCal: opts => newLensCalTrack(opts || {}),   // lib/lens-cal.js fields, metres
   importText: (text, name) => document.getElementById('file').onchange
     ? (async () => { if (/\.(trk|json)$/i.test(name)) {
         const { xml } = await importVdText(text, name);
@@ -5621,11 +5660,43 @@ const NEW_TRACK_XML = `<Simulation>
   </Entity>
 </Simulation>
 `;
-document.getElementById('btnNew').onclick = async () => {
+async function newBlankTrack() {
   if (!confirmDiscard('Starting a new track')) return;
   syncTrackSel(-1);
   await loadFromText(NEW_TRACK_XML, 'new-track.xml');
   setEditMode(true);
+}
+
+// "new" opens a popover: a blank track, or a generated lens-calibration wall
+// (lib/lens-cal.js) loaded like any imported track so it can be edited further
+const newBtn = document.getElementById('btnNew'), newPanel = document.getElementById('newPanel');
+const LC_FIELDS = { distance: 'lcDistance', platform: 'lcPlatform', doorW: 'lcDoorW', doorH: 'lcDoorH',
+  smallS: 'lcSmallS', largeS: 'lcLargeS', squareC: 'lcSquareC', tape: 'lcTape' };
+for (const [k, id] of Object.entries(LC_FIELDS)) document.getElementById(id).value = LENS_CAL_DEFAULTS[k];
+function setNewPanel(open) {
+  if (open) newPanel.style.left = Math.round(newBtn.getBoundingClientRect().left) + 'px';
+  newPanel.classList.toggle('hidden', !open);
+  newBtn.classList.toggle('on', open);
+}
+newBtn.onclick = () => setNewPanel(newPanel.classList.contains('hidden'));
+document.getElementById('newBlank').onclick = () => { setNewPanel(false); newBlankTrack(); };
+async function newLensCalTrack(opts) {
+  const xml = lensCalibrationXml(opts);   // throws on an impossible size
+  if (!confirmDiscard('Starting a new track')) return false;
+  syncTrackSel(-1);
+  const d = +(opts.distance ?? LENS_CAL_DEFAULTS.distance);
+  await loadFromText(xml, `Lens Calibration ${+d.toFixed(3)}m.xml`);
+  setEditMode(true);
+  return true;
+}
+document.getElementById('lcCreate').onclick = async () => {
+  const errEl2 = document.getElementById('lcErr');
+  const opts = {};
+  for (const [k, id] of Object.entries(LC_FIELDS)) opts[k] = document.getElementById(id).value;
+  try {
+    errEl2.textContent = '';
+    if (await newLensCalTrack(opts)) setNewPanel(false);
+  } catch (err) { errEl2.textContent = err.message; }
 };
 
 document.getElementById('btnTop').onclick = e => {

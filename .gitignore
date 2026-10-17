@@ -8,6 +8,9 @@
 # editor imports both on every page load, so they have to ship.
 !/lib/credit.js
 !/lib/neon.js
+# lens-cal.js builds the lens calibration track from the "new" popover;
+# imported on every page load too.
+!/lib/lens-cal.js
 
 # MRSIM object meshes/textures decoded from MRSIM.dkb are the game
 # developer's copyrighted assets. Never redistributed. The published
