@@ -140,6 +140,9 @@
     overflow: hidden; text-overflow: ellipsis; }
   #newPanel .lcRow input { flex: 0 0 auto; width: 72px; box-sizing: border-box; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 3px 6px; font: inherit; }
+  #newPanel .lcRow select { flex: 0 0 auto; width: 120px; box-sizing: border-box;
+    background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); padding: 3px 4px; font: inherit; cursor: pointer; }
   #newPanel .lcRow input:disabled { opacity: .5; }
   #newPanel .lcRow input:focus { outline: none; border-color: var(--accent); }
   #newPanel button { width: 100%; margin-top: 4px; background: var(--surface-2);
@@ -613,6 +616,9 @@
   <p>A flat wall in front of the spawn with a door outline, two tape squares and a
     numbered height ruler, for comparing goggle DVR frames with MRSIM. Sizes in metres unless marked cm.</p>
   <div class="lcRow"><label for="lcDistance">wall distance</label><input id="lcDistance" type="number" step="0.1" min="0.1"></div>
+  <div class="lcRow"><label for="lcFrame" title="the frame selected in MRSIM; fills in the camera height on the stand from the game files (July 2026)">sim frame</label><select id="lcFrame"></select></div>
+  <div class="lcRow"><label for="lcLens">sim lens</label><select id="lcLens"></select></div>
+  <div class="lcRow"><label for="lcAngle" title="MRSIM Camera Angle (uptilt). Use 0 to read the ruler.">camera angle (°)</label><input id="lcAngle" type="number" step="1" min="0" max="60" value="0"></div>
   <div class="lcRow"><label for="lcCameraH" title="camera elevation above the ground that you want; empty = use the platform height below">camera height (cm)</label><input id="lcCameraH" type="number" step="0.5" min="0" placeholder="off"></div>
   <div class="lcRow"><label for="lcCameraOnStand" title="sim camera height with the stand on the ground: set Camera Angle 0, make a track with platform 0, read the ruler at the image centre">camera on stand (cm)</label><input id="lcCameraOnStand" type="number" step="0.5" min="0" placeholder="measure"></div>
   <p id="lcCamHint">Measure once per frame: set Camera Angle 0, make a track with no camera
@@ -928,7 +934,8 @@ import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // importer so a placed neon ring and a imported one are the same object
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
-import { lensCalibrationXml, lensCalPlatform, LENS_CAL_DEFAULTS } from './lib/lens-cal.js';
+import { lensCalibrationXml, lensCalPlatform, lensOffset, LENS_CAL_DEFAULTS, MRSIM_FRAMES,
+  MRSIM_LENSES, STAND_TOP } from './lib/lens-cal.js';
 
 // ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
 // Any file that parses as <Simulation>. Add to this list or use ?track=<path>
@@ -5697,6 +5704,33 @@ function lcSyncCamera() {
   } catch (err) { lcHint.textContent = err.message; }
 }
 lcCam.oninput = lcStand.oninput = lcSyncCamera;
+
+// sim frame / lens / Camera Angle: fill "camera on stand" from the game-file
+// geometry (lib/lens-cal.js MRSIM_FRAMES) and show where the lens sits
+const lcFrame = document.getElementById('lcFrame'), lcLens = document.getElementById('lcLens');
+const lcAngle = document.getElementById('lcAngle');
+lcFrame.add(new Option('custom (measured)', ''));
+for (const [k, fr] of Object.entries(MRSIM_FRAMES)) lcFrame.add(new Option(fr.name, k));
+for (const [k, ln] of Object.entries(MRSIM_LENSES)) lcLens.add(new Option(`${k} (${ln.fov}°)`, k));
+function lcSimOpts() {
+  return lcFrame.value ? { frame: lcFrame.value, lens: lcLens.value, cameraAngle: +lcAngle.value || 0 } : {};
+}
+function lcSyncFrame() {
+  const o = lcSimOpts();
+  const off = o.frame && lensOffset(o.frame, o.lens, o.cameraAngle);
+  lcStand.readOnly = !!off;
+  if (off) lcStand.value = +((STAND_TOP + off.up) * 100).toFixed(2);
+  lcSyncCamera();
+  if (off) {
+    const d = parseFloat(document.getElementById('lcDistance').value) || 0;
+    if (!lcCameraOpts().cameraH) lcHint.textContent = `lens ${lcStand.value} cm above the ground on the stand`;
+    lcHint.textContent += ` · ${+(off.forward * 100).toFixed(2)} cm forward of the spawn, ` +
+      `${+((d - off.forward) * 100).toFixed(2)} cm from the wall (game files, July 2026)`;
+  }
+}
+lcFrame.onchange = lcLens.onchange = lcAngle.oninput = lcSyncFrame;
+document.getElementById('lcDistance').addEventListener('input', lcSyncFrame);
+lcCam.addEventListener('input', () => { if (lcFrame.value) lcSyncFrame(); });
 function setNewPanel(open) {
   if (open) newPanel.style.left = Math.round(newBtn.getBoundingClientRect().left) + 'px';
   newPanel.classList.toggle('hidden', !open);
@@ -5717,7 +5751,7 @@ document.getElementById('lcCreate').onclick = async () => {
   const errEl2 = document.getElementById('lcErr');
   const opts = {};
   for (const [k, id] of Object.entries(LC_FIELDS)) opts[k] = document.getElementById(id).value;
-  Object.assign(opts, lcCameraOpts());
+  Object.assign(opts, lcCameraOpts(), lcSimOpts());
   try {
     errEl2.textContent = '';
     if (await newLensCalTrack(opts)) setNewPanel(false);
