@@ -18,6 +18,7 @@
     --line-2: #333c50;          /* control edges */
     --line-3: #232838;          /* dividers inside a panel */
     --text: #e3e7ef;
+    --text-strong: #fff;        /* titles, armed / active controls */
     --dim: #949db1;             /* labels, secondary text */
     --faint: #6f7889;           /* hints, disabled */
     --accent: #5a8dff;          /* primary: app actions, focus */
@@ -582,6 +583,37 @@
     border: 1px solid var(--accent); color: #fff; border-radius: var(--r-sm);
     padding: 6px 15px; font: inherit; cursor: pointer; font-weight: 600; }
   #notice button:hover { background: #2c4d85; }
+
+  /* ---- keys and mouse help (opened with "?") ---- */
+  #help { position: fixed; inset: 0; z-index: 30; display: none;
+    background: #05070bd9; backdrop-filter: blur(4px); }
+  #help.show { display: flex; align-items: center; justify-content: center; }
+  #help .sheet { width: min(860px, 94vw); max-height: 92vh; overflow: auto;
+    background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-lg);
+    padding: 16px 20px 12px; box-shadow: 0 28px 90px #000000b3; }
+  #help .helpHead { display: flex; align-items: center; margin-bottom: 6px; }
+  #help h2 { font-size: 15px; margin: 0; color: var(--text-strong); }
+  #help .helpHead button { margin-left: auto; background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 10px;
+    font: inherit; cursor: pointer; }
+  #help .helpHead button:hover { border-color: var(--accent); }
+  #help .helpCols { display: grid; gap: 4px 22px;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  #help h3 { font-size: 10.5px; margin: 12px 0 6px; color: var(--dim); font-weight: 600;
+    text-transform: uppercase; letter-spacing: .07em; }
+  #help dl { display: grid; grid-template-columns: minmax(7em, max-content) 1fr; gap: 5px 10px;
+    margin: 0; align-items: baseline; }
+  #help dt { color: var(--text); }
+  #help dd { margin: 0; color: var(--dim); }
+  #help p { margin: 4px 0; color: var(--dim); line-height: 1.5; }
+  #help p b { color: var(--text); font-weight: 600; }
+  #help .faint { color: var(--faint); font-size: 11px; }
+  #help .swBlue { color: #4a83ff; }
+  #help .swRed { color: var(--danger); }
+  kbd { display: inline-block; min-width: 1.6em; padding: 0 4px; text-align: center;
+    font: inherit; font-size: 11px; line-height: 1.5; color: var(--text);
+    background: var(--surface-3); border: 1px solid var(--line-2);
+    border-bottom-width: 2px; border-radius: 4px; }
 </style>
 
 <div id="app"></div>
@@ -603,6 +635,7 @@
   <button id="btnRedo" class="hist" title="redo (Ctrl-Shift-Z / Ctrl-Y)" disabled>↷</button>
   <button id="btnExport" title="download the edited track as MRSIM .xml">⤓ export</button>
   <span class="spacer"></span>
+  <button id="btnHelp" title="keys and mouse (?)" aria-label="keys and mouse help">?</button>
   <button id="btnDiag" class="diagchip ok" title="track validity — click for full diagnostics">✓ track valid</button>
   <span class="status" id="status">…</span>
 </div>
@@ -776,10 +809,8 @@
     </div>
   </div>
   <div class="hint" id="edHint">click an object or checkpoint ring to select ·
-    <b>Ctrl</b>-click adds/removes from the selection (move many at once) ·
-    keys: <b>g</b> move / <b>r</b> rotate / <b>s</b> scale / <b>Esc</b> deselect /
-    <b>Ctrl-G</b> group selection / <b>Ctrl-Shift-G</b> ungroup /
-    <b>Ctrl-Z</b> undo / <b>Ctrl-Shift-Z</b> redo · MRSIM coords (z up), yaw = angleDegrees</div>
+    <b>Ctrl</b>-click to select more than one · <b>g</b> move / <b>r</b> rotate /
+    <b>s</b> scale · press <kbd>?</kbd> for all keys · MRSIM coords (z up), yaw = angleDegrees</div>
 
   <details class="edSect" id="edMirrorSect" open>
     <summary>mirror track</summary>
@@ -900,6 +931,62 @@
     <p>This editor currently only supports editing and exporting tracks from the
       MRSIM simulator.</p>
     <button id="noticeOk" autofocus>Got it</button>
+  </div>
+</div>
+
+<!-- keyboard / mouse reference: opened with "?" or the toolbar's ? button. The
+     camera line is filled from the active control scheme each time it opens. -->
+<div id="help">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+    <div class="helpHead">
+      <h2 id="helpTitle">Keys and mouse</h2>
+      <button id="helpClose" title="close (Esc)">✕ close</button>
+    </div>
+    <div class="helpCols">
+      <section>
+        <h3>anywhere</h3>
+        <dl>
+          <dt><kbd>?</kbd></dt><dd>this help</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>undo</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></dt><dd>redo (also <kbd>Ctrl</kbd> <kbd>Y</kbd>)</dd>
+          <dt><kbd>Esc</kbd></dt><dd>close this help</dd>
+        </dl>
+        <h3>camera</h3>
+        <p id="helpCam"></p>
+        <p class="faint">change the scheme with the ⟲ selector in the toolbar</p>
+      </section>
+      <section>
+        <h3>edit mode</h3>
+        <dl>
+          <dt>click</dt><dd>select an object or checkpoint ring</dd>
+          <dt><kbd>Ctrl</kbd> click</dt><dd>add to / remove from the selection</dd>
+          <dt><kbd>G</kbd> / <kbd>T</kbd></dt><dd>move</dd>
+          <dt><kbd>R</kbd></dt><dd>rotate</dd>
+          <dt><kbd>S</kbd></dt><dd>scale</dd>
+          <dt><kbd>D</kbd></dt><dd>duplicate</dd>
+          <dt><kbd>Del</kbd> / <kbd>X</kbd></dt><dd>delete</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>G</kbd></dt><dd>group the selection</dd>
+          <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>G</kbd></dt><dd>ungroup</dd>
+          <dt><kbd>Esc</kbd></dt><dd>stop placing, then deselect</dd>
+          <dt><kbd>Shift</kbd> click</dt><dd>place more than one of the armed object</dd>
+        </dl>
+      </section>
+      <section>
+        <h3>palette markers</h3>
+        <dl>
+          <dt>◉</dt><dd>checkpoint: joins the lap when placed</dd>
+          <dt>▫</dt><dd>scenery only: not part of the lap</dd>
+        </dl>
+        <h3>in the scene</h3>
+        <dl>
+          <dt class="swBlue">ring</dt><dd>checkpoint (arrow = fly-through direction)</dd>
+          <dt class="swRed">red</dt><dd>start / finish</dd>
+          <dt>axes</dt><dd>origin: x red, y green, z blue (z is up in MRSIM)</dd>
+        </dl>
+      </section>
+    </div>
+    <p class="faint">Shortcuts do not fire while you type in a field. Hold the pointer over a
+      control to read what it does.</p>
   </div>
 </div>
 
@@ -2412,7 +2499,7 @@ function setPrimary(name, silent = false) {
   if (!rec || !rec.trEl) {
     tc.detach();
     document.getElementById('edHint').innerHTML = name == null
-      ? 'click an object or checkpoint ring to select · <b>Ctrl</b>-click adds to the selection'
+      ? 'click an object or checkpoint ring to select · <b>Ctrl</b>-click adds to the selection · <kbd>?</kbd> all keys'
       : `<span class="locked">not editable: ${rec ? rec.reason : 'unknown element'}</span>`;
     refreshEditPanelNumbers();
     renderLapPanel(); refreshWHRow(); refreshRefRow(); refreshColorRow(); refreshStartRow();
@@ -3974,7 +4061,7 @@ function armPlace(def) {
   disposePlaceMarker();
   document.getElementById('edHint').innerHTML = def
     ? `placing <b>${def.label}</b> — click the ground · shift-click = keep placing · Esc cancels`
-    : 'click an object or checkpoint ring to select · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo';
+    : 'click an object or checkpoint ring to select · <b>g</b>/<b>r</b>/<b>s</b> modes · <b>Ctrl-Z</b> undo · <kbd>?</kbd> all keys';
   if (!def) return;
   buildPlaceGhost(def).then(g => {
     if (placeUi.token !== token || placeUi.def !== def) {   // armed something else meanwhile
@@ -5790,9 +5877,40 @@ document.getElementById('edModeS').onclick = () => setGizmoMode('scale');
 addEventListener('keydown', e => {
   if (builderOpen && e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeBuilder(); }
 }, true);
+// ---- keys and mouse help ----
+const helpEl = document.getElementById('help');
+function setHelp(open) {
+  if (open) document.getElementById('helpCam').innerHTML =
+    `<b>${CTRL_SCHEMES[ctrlScheme].label}</b>: ${CTRL_SCHEMES[ctrlScheme].hint}`;
+  helpEl.classList.toggle('show', open);
+  document.getElementById('btnHelp').classList.toggle('on', open);
+  if (open) document.getElementById('helpClose').focus();
+}
+document.getElementById('btnHelp').onclick = () => setHelp(!helpEl.classList.contains('show'));
+document.getElementById('helpClose').onclick = () => setHelp(false);
+helpEl.addEventListener('mousedown', e => { if (e.target === helpEl) setHelp(false); });
+window.__help = setHelp;
+
+// true while the user types into a field, so a letter never doubles as a
+// shortcut. Checkboxes, colour swatches and range sliders take no text: the
+// shortcuts stay live after a click on one of them.
+const NO_TEXT_INPUT = /^(checkbox|radio|color|range|button|submit|file)$/;
+function typingInField() {
+  const a = document.activeElement;
+  if (!a) return false;
+  if (a.isContentEditable || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT') return true;
+  return a.tagName === 'INPUT' && !NO_TEXT_INPUT.test(a.type);
+}
+
 addEventListener('keydown', e => {
   if (builderOpen) return;                 // modal owns the keyboard while open
-  if (/INPUT|SELECT|TEXTAREA/.test(document.activeElement?.tagName)) return;
+  if (helpEl.classList.contains('show')) {
+    if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); setHelp(false); }
+    return;
+  }
+  if (typingInField()) return;
+  if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+    e.preventDefault(); setHelp(true); return; }
   if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
     e.preventDefault(); e.shiftKey ? redoEdit() : undoEdit(); return; }
   if (e.key.toLowerCase() === 'y' && (e.ctrlKey || e.metaKey)) {
@@ -5803,6 +5921,10 @@ addEventListener('keydown', e => {
     e.shiftKey ? ungroupSelection() : groupSelection();
     return;
   }
+  // the single-letter keys below are plain presses only: Ctrl-D (bookmark),
+  // Ctrl-S (save page) and Ctrl-R (reload) used to duplicate, scale or rotate
+  // the selection on their way to the browser
+  if (e.ctrlKey || e.metaKey || e.altKey) return;
   if (e.key === 'g' || e.key === 't') setGizmoMode('translate');
   else if (e.key === 'r') setGizmoMode('rotate');
   else if (e.key === 's') setGizmoMode('scale');
