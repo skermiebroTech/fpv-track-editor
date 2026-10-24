@@ -268,6 +268,7 @@
   #editPanel { left: 10px; width: 272px; max-height: var(--panel-max-h);
     overflow: auto; border-color: #3f5330; display: none; }
   #editPanel.show { display: block; }
+  #editPanel.noSel #edXform { display: none; }
   #editPanel h3, #editPanel details.edSect > summary {
     font-size: 10.5px; margin: 12px 0 6px; color: var(--edit-text); font-weight: 600;
     text-transform: uppercase; letter-spacing: .07em;
@@ -396,6 +397,9 @@
     font: inherit; font-size: 11px; cursor: pointer; }
   #palSearchRow button:hover { background: var(--surface-3); border-color: var(--edit);
     color: var(--text); }
+  /* what the ◉ / ▫ in front of every palette name means, said once */
+  #editPanel .palKey { display: flex; gap: 12px; margin: 0 0 6px; color: var(--faint);
+    font-size: 10.5px; }
   #editPanel .palNone { grid-column: 1 / -1; color: var(--faint); font-size: 11px; padding: 6px 2px; }
 
   /* ---- palette hover preview ---- */
@@ -749,8 +753,11 @@
     <button id="tplCalCancel">cancel</button>
   </div>
 </div>
-<div id="editPanel">
+<div id="editPanel" class="noSel">
   <h2 id="edTitle">nothing selected</h2>
+  <!-- the move / rotate / scale fields: folded away while nothing is selected,
+       so the palette and the lap list sit near the top of the panel -->
+  <div id="edXform">
   <div class="modes">
     <button id="edModeT" class="on">move</button>
     <button id="edModeR">rotate</button>
@@ -777,26 +784,26 @@
       <option value="90">90°</option>
     </select>
   </div>
-  <div class="row"><label>x</label><input id="edX" type="number" step="0.1"></div>
-  <div class="row"><label>y</label><input id="edY" type="number" step="0.1"></div>
-  <div class="row"><label>z</label><input id="edZ" type="number" step="0.1"></div>
-  <div class="row"><label>yaw °</label><input id="edYaw" type="number" step="1"></div>
-  <div class="row"><label>pitch °</label><input id="edPitch" type="number" step="1"></div>
-  <div class="row"><label>roll °</label><input id="edRoll" type="number" step="1"></div>
-  <div class="row"><label>scale</label><input id="edS" type="number" step="0.05" min="0.2" max="5"></div>
+  <div class="row"><label for="edX">x</label><input id="edX" type="number" step="0.1"></div>
+  <div class="row"><label for="edY">y</label><input id="edY" type="number" step="0.1"></div>
+  <div class="row"><label for="edZ">z</label><input id="edZ" type="number" step="0.1"></div>
+  <div class="row"><label for="edYaw">yaw °</label><input id="edYaw" type="number" step="1"></div>
+  <div class="row"><label for="edPitch">pitch °</label><input id="edPitch" type="number" step="1"></div>
+  <div class="row"><label for="edRoll">roll °</label><input id="edRoll" type="number" step="1"></div>
+  <div class="row"><label for="edS">scale</label><input id="edS" type="number" step="0.05" min="0.2" max="5"></div>
   <div class="row" id="edWHRow" style="display:none">
-    <label title="width × height × depth, metres">size</label>
+    <label for="edW" title="width × height × depth, metres">size</label>
     <input id="edW" type="number" step="0.1" min="0.5" title="width (m)">
     <input id="edH" type="number" step="0.1" min="0.5" title="height (m)">
     <input id="edD" type="number" step="0.1" min="0.05" title="depth (m)"></div>
   <div id="edRefRow" style="display:none">
     <h3 class="sub">checkpoint ref</h3>
     <div class="subhint">the ring and its crossing arrow only — the object stays put</div>
-    <div class="row"><label>position</label>
+    <div class="row"><label for="edRefX">position</label>
       <input id="edRefX" type="number" step="0.1" title="ref x">
       <input id="edRefY" type="number" step="0.1" title="ref y">
       <input id="edRefZ" type="number" step="0.1" title="ref z (up)"></div>
-    <div class="row"><label title="yaw / pitch / roll, degrees">rotation</label>
+    <div class="row"><label for="edRefYaw" title="yaw / pitch / roll, degrees">rotation</label>
       <input id="edRefYaw" type="number" step="1" title="ref yaw">
       <input id="edRefPitch" type="number" step="1" title="ref pitch">
       <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
@@ -810,12 +817,13 @@
   </div>
   <div class="btnRow"><button id="edToBuilder"
     title="copy the selected object's shapes (and checkpoint) into the object builder as a new, reusable custom object — with a multi-selection, all selected objects merge into one">＋ copy to object builder</button></div>
+  </div>
   <div id="edStartRow" class="edGroup" style="display:none">
     <div class="btnRow"><button id="edSetStart">★ set as start / finish</button></div>
     <div class="hint" id="edStartTip">the red-banner gate the lap starts &amp; finishes at</div>
   </div>
   <div id="edColorRow" class="edGroup">
-    <div class="row"><label>colour</label>
+    <div class="row"><label for="edColor">colour</label>
       <input id="edColor" class="swatch" type="color" value="#e67300" list="colList" title="colour to apply">
       <span class="hint flush" id="edColorTip">recolour by material</span></div>
     <div class="row"><label title="your palette — saved colours also show as presets inside every colour picker">saved</label>
@@ -831,7 +839,29 @@
     <b>Ctrl</b>-click to select more than one · <b>g</b> move / <b>r</b> rotate /
     <b>s</b> scale · press <kbd>?</kbd> for all keys · MRSIM coords (z up), yaw = angleDegrees</div>
 
-  <details class="edSect" id="edMirrorSect" open>
+  <details class="edSect" id="edPlaceSect" open>
+    <summary>place object <span id="palCount"></span></summary>
+    <div class="palKey" title="hold the pointer over an object to see it, click it, then click the ground to place it">
+      <span>◉ joins the lap</span><span>▫ scenery only</span></div>
+    <div id="palSearchRow">
+      <input id="palSearch" type="search" placeholder="search objects…" aria-label="search objects" autocomplete="off"
+        spellcheck="false">
+      <button id="palClear" title="clear search" aria-label="clear search">✕</button>
+    </div>
+    <div class="pal" id="palette"></div>
+    <button id="palAll" class="palAll"
+      title="place one of every object in a labelled grid — a single undo step">
+      add one of every object (test grid)
+    </button>
+  </details>
+
+  <details class="edSect" id="edLapSect" open>
+    <summary>lap — checkpoint order <span id="lapCount"></span></summary>
+    <div id="lapList"></div>
+    <div class="lapCk"><input type="checkbox" id="lapCircuit"> <label for="lapCircuit"
+      style="width:auto">circuit (lap closes back to #1)</label></div>
+  </details>
+  <details class="edSect" id="edMirrorSect">
     <summary>mirror track</summary>
     <div class="hint" style="margin:2px 0 6px">flip every object across a plane through the origin.
       MRSIM coords, z up. one undo step. asymmetric objects (start banner text, arrows) stay
@@ -851,26 +881,6 @@
     </div>
   </details>
 
-  <details class="edSect" id="edPlaceSect">
-    <summary>place object <span>(click canvas · shift = multi)</span></summary>
-    <div id="palSearchRow">
-      <input id="palSearch" type="search" placeholder="search objects…" autocomplete="off"
-        spellcheck="false">
-      <button id="palClear" title="clear search">✕</button>
-    </div>
-    <div class="pal" id="palette"></div>
-    <button id="palAll" class="palAll"
-      title="place one of every object in a labelled grid — a single undo step">
-      add one of every object (test grid)
-    </button>
-  </details>
-
-  <details class="edSect" id="edLapSect" open>
-    <summary>lap — checkpoint order</summary>
-    <div id="lapList"></div>
-    <div class="lapCk"><input type="checkbox" id="lapCircuit"> <label for="lapCircuit"
-      style="width:auto">circuit (lap closes back to #1)</label></div>
-  </details>
 </div>
 
 <!-- object builder: compose a custom track object from box/cylinder parts,
@@ -4514,6 +4524,7 @@ function renderLapPanel() {
     `<button data-act="rm" title="remove from lap">✕</button></div>`).join('') ||
     '<div class="hint">no checkpoints in the lap yet — place a gate or select an object and “+ lap”</div>';
   document.getElementById('lapCircuit').checked = lapIsCircuit();
+  document.getElementById('lapCount').textContent = names.length ? `(${names.length})` : '';
   refreshLapSub();
 }
 // a multi-checkpoint object (pole cube, ladder) lists each of its checkpoints
@@ -4785,6 +4796,18 @@ function renderPalette() {
   build.title = 'design your own track object from boxes, cylinders, spheres, pyramids, wedges & cones';
   build.onclick = () => openBuilder(null);
   pal.appendChild(build);
+  const n = pal.querySelectorAll('button[data-pid]:not([data-pid="__build"])').length;
+  document.getElementById('palCount').textContent = palFilter ? `(${n} match)` : `(${n})`;
+}
+
+// the edit panel's sections remember open / closed across visits, so a panel
+// set up the way you work stays that way
+for (const d of document.querySelectorAll('#editPanel details.edSect')) {
+  const key = 'mrsim.edSect.' + d.id;
+  try { const v = localStorage.getItem(key); if (v) d.open = v === 'open'; } catch {}
+  d.addEventListener('toggle', () => {
+    try { localStorage.setItem(key, d.open ? 'open' : 'closed'); } catch {}
+  });
 }
 
 const palSearchEl = document.getElementById('palSearch');
@@ -5757,6 +5780,7 @@ function eulerFromRot(e, sx, sy, sz) {
   return { yaw: -u.z / DEG, pitch: u.x / DEG, roll: u.y / DEG };
 }
 function refreshEditPanelNumbers(fromProxy = false) {
+  document.getElementById('editPanel').classList.toggle('noSel', editUi.selectedName == null);
   const rec = editState?.index.get(editUi.selectedName);
   if (!rec || !rec.trEl) { Object.values(edIn).forEach(i => { i.value = ''; i.disabled = true; }); return; }
   let L;
