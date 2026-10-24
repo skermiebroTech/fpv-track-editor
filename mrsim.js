@@ -99,6 +99,7 @@ function matHint(shape, dims, material, tags) {
     if (/FlagPole/.test(material)) return 'dark';           // inner pipe
     if (/FlagStalk/.test(material)) return 'stalk';
     if (/GateTop/.test(material)) return 'panelTop';
+    if (/PVC/.test(material)) return 'pvc';
     if (/GateSide|Hurdle/.test(material)) return 'panelSide';
     // imported VelociDrone blocks (emitted by import.js)
     const blk = material.match(/^Block(\w+?)Material$/);
@@ -108,6 +109,11 @@ function matHint(shape, dims, material, tags) {
     if (glow) return `glow:${glow[1].toLowerCase()}`;
   }
   const src = tags.join(' ');
+  // Champs25 LED gate/pole: the colour macro wraps the LightsOff one, so a
+  // coloured name in the tags wins
+  const led = src.match(/Champs25(?:Gate|Pole)(Red|Green|Blue|Yellow|White)/);
+  if (led) return 'led:' + led[1].toLowerCase();
+  if (/Champs25/.test(src)) return 'dark';
   if (shape === 'box') {
     if (/7x7Mat/.test(src)) return 'padMat';                 // 3x3 launch mat
     if (/ShadeCanopy|LaunchStand|StartBlock/.test(src)) return 'dark';
@@ -404,7 +410,7 @@ function walkInclude(node, ctx, st) {
     st.location ??= basename(path).replace(/\.xml$/, '').replace(/(?<=[a-z])(?=[A-Z])/g, ' ');
     return;
   }
-  if (/Materials\.xml$|\/Foliage\/|Sound/.test(path)) return;
+  if (/Materials\.xml$|Sound/.test(path)) return;
   const xml = MRSIM_LIB[path];
   if (!xml) { note(st, `unknown include ${path}`); return; }
   if (ctx.depth > 24) return;
@@ -429,7 +435,7 @@ export function includeEntityNames(file, src = '/track.xml', depth = 0) {
   const path = file.startsWith('/') ? file : dirname(src) + file;
   const out = [];
   if (depth > 8 || /\/Locations\//.test(path) ||
-      /Materials\.xml$|\/Foliage\/|Sound/.test(path)) return out;
+      /Materials\.xml$|Sound/.test(path)) return out;
   const xml = MRSIM_LIB[path];
   if (!xml) return out;
   let doc = libDocs.get(path);
@@ -486,6 +492,13 @@ function assemble(st, fileName) {
     isStart: [...e.tags].some(t => /StartFinish/.test(t))
       || e.prims.some(p => /Start(Finish|Banner)/.test(p.material || '')),
     tags: [...e.tags],
+    // the CheckpointList name of every checkpoint inside the element, dotted
+    // from the element down ("cube8.topEntry"); one entry for a plain gate
+    cpNames: e.cps.map(i => {
+      const p = st.checkpoints[i].path;
+      const at = p.indexOf(e.name);
+      return (at >= 0 ? p.slice(at) : p).join('.');
+    }),
     prims: e.prims.map(p => ({
       shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
       solid: p.solid !== false,

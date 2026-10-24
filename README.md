@@ -55,7 +55,8 @@ python3 -m http.server 8000
 | `community/` | Community-contributed objects, one `.json` per contributor (see below) |
 | `community/index.json` | Generated list of the community files — do not edit by hand |
 | `scripts/build-community-index.mjs` | Validates `community/` and rebuilds the index (runs in CI) |
-| `models/mrsim/models.json` | Model index for MRSIM objects (empty subset by default; `.glb` files stay local) |
+| `models/mrsim/` | MRSIM's own track-object and location meshes and textures, used with the game developer's permission; `models.json` lists the shipped set |
+| `lib/lookalike.js` | Hand-built stand-ins, drawn only when a game mesh is not in `models.json` |
 
 ## Add your object to the community library
 

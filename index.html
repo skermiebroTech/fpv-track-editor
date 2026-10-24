@@ -300,6 +300,9 @@
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 0; font: inherit;
     font-size: 11.5px; cursor: pointer; }
   #editPanel .btnRow button:hover { background: var(--surface-3); border-color: var(--accent); }
+  #editPanel .btnRow select { flex: 1.4; min-width: 0; background: var(--surface-2);
+    color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    font: inherit; font-size: 11.5px; }
   #editPanel .btnRow button.danger:hover { background: #2e1a1a;
     border-color: var(--danger); color: var(--danger-text); }
   #editPanel .btnRow button.on { background: #4a1e1e; border-color: var(--danger); color: #ff9a8a; }
@@ -591,6 +594,8 @@
   <button id="btnProj" title="perspective — click for orthographic / isometric">perspective</button>
   <select id="ctrlScheme" title="camera control scheme — matches popular 3D/CAD tools"></select>
   <button id="btnEnv" title="environment — grid, sky and ground">environment</button>
+  <button id="btnLook" title="game look — the daytime sky, sun and grass of MRSIM (click again for the editor look)">game look</button>
+  <select id="locSel" title="track location — the MRSIM environment the track loads in (exported with the track)"></select>
   <button id="btnTpl" title="template images — reference photos / top-down maps (editor only, not exported)">templates</button>
   <button id="btnCp" class="on">checkpoints</button>
   <button id="btnEdit">✎ edit</button>
@@ -650,6 +655,15 @@
     <label for="skyColor">sky</label>
     <span class="envHint">background &amp; distance haze</span>
     <input id="skyColor" class="swatch" type="color" value="#0d0f14" title="sky colour">
+  </div>
+  <div class="envRow">
+    <label for="fogLevel">fog</label>
+    <span class="envHint">distance haze in the sky colour</span>
+    <select id="fogLevel" title="how much the distance fades into the sky">
+      <option value="off">off</option>
+      <option value="light">light</option>
+      <option value="normal">normal</option>
+    </select>
   </div>
   <div class="envRow">
     <label for="groundColor">ground</label>
@@ -736,6 +750,8 @@
       <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
   </div>
   <div class="btnRow">
+    <select id="edLapSub" style="display:none"
+      title="this object holds more than one checkpoint — pick the one “+ lap” adds"></select>
     <button id="edLapAdd">+ lap</button>
     <button id="edDup">duplicate</button>
     <button id="edDel" class="danger">✕ delete</button>
@@ -915,8 +931,8 @@
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=12",
-    "./mrsim-lib.js": "./mrsim-lib.js?v=6"
+    "./mrsim.js": "./mrsim.js?v=14",
+    "./mrsim-lib.js": "./mrsim-lib.js?v=7"
   }
 }
 </script>
@@ -927,12 +943,14 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { TransformControls } from 'three/addons/controls/TransformControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { parseMrsim, includeEntityNames } from './mrsim.js';
+import { MRSIM_LIB } from './mrsim-lib.js';
 // the export credit — a tiny dependency-free module, so stamping a credit never
 // has to pull in the (lazily loaded) VelociDrone importer
 import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
   from './lib/credit.js';
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // importer so a placed neon ring and a imported one are the same object
+import { lookalike, LOOKALIKE_NAMES } from './lib/lookalike.js';
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
 import { lensCalibrationXml, lensCalPlatform, lensOffset, LENS_CAL_DEFAULTS, MRSIM_FRAMES,
   MRSIM_LENSES, STAND_TOP } from './lib/lens-cal.js';
@@ -1054,12 +1072,44 @@ renderer.domElement.addEventListener('auxclick', noAutoscroll, { passive: false 
 window.__ctrl = { get: () => ctrlScheme, set: setCtrlScheme,
   schemes: Object.keys(CTRL_SCHEMES), buttons: () => controls.mouseButtons };
 
-scene.add(new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.0));
+const hemi = new THREE.HemisphereLight('#c9d6ff', '#20242c', 1.0);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight('#fff', 1.4);
 sun.position.set(40, 80, 30); sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, near: 1, far: 300 });
 scene.add(sun);
+
+// ---- game look: MRSIM's daytime sky ----------------------------------------
+// The sky, sun and grass of the game, matched to an in-game screenshot at
+// Baylands: blue-grey overhead fading to a warm horizon, a strong blue sky
+// light, a warm sun and soft shadows. The game keeps its sky in the engine,
+// not in the data files, so these are measured colours, not game values.
+const GAME_LOOK = {
+  zenith: '#4f6c80', horizon: '#9d9362', below: '#3a3a1c',
+  ground: '#2a2c02', grid: '#6b7350',
+  hemiSky: '#bcd0e0', hemiGround: '#4a4a2a', hemiI: 1.05,
+  sunColor: '#ffe7c4', sunI: 1.25,
+};
+const skyDome = new THREE.Mesh(new THREE.SphereGeometry(1, 32, 16), new THREE.ShaderMaterial({
+  uniforms: {
+    zenith: { value: new THREE.Color(GAME_LOOK.zenith) },
+    horizon: { value: new THREE.Color(GAME_LOOK.horizon) },
+    below: { value: new THREE.Color(GAME_LOOK.below) },
+  },
+  vertexShader: `varying vec3 vDir;
+    void main() { vDir = normalize(position);
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `uniform vec3 zenith; uniform vec3 horizon; uniform vec3 below; varying vec3 vDir;
+    void main() { float h = vDir.y;
+      vec3 c = h > 0.0 ? mix(horizon, zenith, pow(smoothstep(0.0, 0.6, h), 0.7)) : mix(horizon, below, smoothstep(0.0, 0.08, -h));
+      gl_FragColor = vec4(c, 1.0);
+      #include <colorspace_fragment>
+    }`,
+  side: THREE.BackSide, depthWrite: false, fog: false,
+}));
+skyDome.renderOrder = -1; skyDome.frustumCulled = false; skyDome.visible = false;
+scene.add(skyDome);
 
 // ---- environment: grid, sky and ground ------------------------------------
 // The look of the world you build in is the user's, not the editor's. The grid
@@ -1071,7 +1121,8 @@ scene.add(sun);
 // The grid also defines the plane objects get dropped onto, and that stays true
 // with the grid switched off, so the drop height lives in `gridY`, not in the
 // helper.
-const ENV_DEFAULTS = { cell: 5, grid: '#2a3446', sky: '#0d0f14', ground: '#151922' };
+const ENV_DEFAULTS = { cell: 5, grid: '#2a3446', sky: '#0d0f14', ground: '#151922', fog: 'light', look: 'editor' };
+const ENV_FOGS = ['off', 'light', 'normal'];
 const ENV_CELLS = [10, 5, 2, 1, 0];            // the #gridSize options; 0 = off
 const ENV_KEY = 'mrsim.env';
 const env = { ...ENV_DEFAULTS };
@@ -1087,14 +1138,15 @@ function buildGrid() {
   if (grid) { scene.remove(grid); grid.geometry.dispose(); grid.material.dispose(); grid = null; }
   if (!env.cell) return;
   const divisions = Math.round(GRID_EXTENT / env.cell);
+  const gridHex = env.look === 'game' ? GAME_LOOK.grid : env.grid;
   grid = new THREE.GridHelper(GRID_EXTENT, divisions,
-    gridShade(env.grid, 0.45), gridShade(env.grid, -0.25));
+    gridShade(gridHex, 0.45), gridShade(gridHex, -0.25));
   // GridHelper only highlights its two centre lines; colour every GRID_MAJOR-th
   // line too, so a fine grid still shows the coarse marks. Its geometry pushes
   // four vertices per step i (the x-line pair then the z-line pair), all one
   // colour, so one setXYZ run per step recolours both lines of that step.
   const col = grid.geometry.attributes.color;
-  const major = new THREE.Color(gridShade(env.grid, 0.15));
+  const major = new THREE.Color(gridShade(gridHex, 0.15));
   for (let i = 0; i <= divisions; i++) {
     const step = i - divisions / 2;
     if (step === 0 || step % GRID_MAJOR !== 0) continue;
@@ -1116,15 +1168,38 @@ const HEX_RE = /^#[0-9a-f]{6}$/i;
 function applyEnv() {
   // the fog is the sky seen through distance — keeping them one colour is what
   // makes far objects fade out instead of turning into a grey band
-  scene.background.set(env.sky);
-  scene.fog.color.set(env.sky);
-  ground.material.color.set(env.ground);
+  const game = env.look === 'game';
+  scene.background.set(game ? GAME_LOOK.horizon : env.sky);
+  scene.fog.color.set(game ? GAME_LOOK.horizon : env.sky);
+  skyDome.visible = game;
+  hemi.color.set(game ? GAME_LOOK.hemiSky : '#c9d6ff');
+  hemi.groundColor.set(game ? GAME_LOOK.hemiGround : '#20242c');
+  hemi.intensity = game ? GAME_LOOK.hemiI : 1.0;
+  sun.color.set(game ? GAME_LOOK.sunColor : '#ffffff');
+  sun.intensity = game ? GAME_LOOK.sunI : 1.4;
+  applyFog();
+  ground.material.color.set(game ? GAME_LOOK.ground : env.ground);
   buildGrid();
+  document.getElementById('btnLook').classList.toggle('on', game);
+  // the colour pickers set the editor look; the game look has fixed colours
+  for (const id of ['skyColor', 'groundColor', 'gridColor']) document.getElementById(id).disabled = game;
   const el = id => document.getElementById(id);
   el('gridSize').value = String(env.cell);
   el('gridColor').value = env.grid;
   el('skyColor').value = env.sky;
   el('groundColor').value = env.ground;
+  el('fogLevel').value = env.fog;
+}
+// fog distances: `fogBase` is the track-sized distance frameCamera picks;
+// light pushes the haze four times further out, off moves it out of reach
+let fogBase = 320;
+function applyFog() {
+  const [near, far] = env.fog === 'off' ? [1e7, 1e7 + 1]
+    : env.fog === 'light' ? [fogBase, fogBase * 4] : [90, fogBase];
+  scene.fog.near = near; scene.fog.far = far;
+  // see as far as the fog lets you: Baylands reaches about 1 km from the origin
+  camera.far = Math.max(camera.far, env.fog === 'normal' ? 0 : 4000);
+  camera.updateProjectionMatrix();
 }
 function setEnv(patch) {
   Object.assign(env, patch);
@@ -1144,11 +1219,15 @@ function resetEnv() {
     if (ENV_CELLS.includes(+saved.cell)) env.cell = +saved.cell;
     for (const k of ['grid', 'sky', 'ground'])
       if (HEX_RE.test(saved[k] || '')) env[k] = saved[k];
+    if (ENV_FOGS.includes(saved.fog)) env.fog = saved.fog;
+    if (saved.look === 'game') env.look = 'game';
   } catch {}
   document.getElementById('gridSize').onchange = e => setEnv({ cell: +e.target.value || 0 });
   document.getElementById('gridColor').oninput = e => setEnv({ grid: e.target.value });
   document.getElementById('skyColor').oninput = e => setEnv({ sky: e.target.value });
   document.getElementById('groundColor').oninput = e => setEnv({ ground: e.target.value });
+  document.getElementById('fogLevel').onchange = e => setEnv({ fog: e.target.value });
+  document.getElementById('btnLook').onclick = () => setEnv({ look: env.look === 'game' ? 'editor' : 'game' });
   document.getElementById('envReset').onclick = resetEnv;
   const envBtn = document.getElementById('btnEnv'), envPanel = document.getElementById('envPanel');
   envBtn.onclick = () => {
@@ -1164,6 +1243,9 @@ scene.add(new THREE.AxesHelper(3));   // origin marker: +x red, +y(up) green, +z
 const trackGroup = new THREE.Group();  scene.add(trackGroup);
 const cpGroup = new THREE.Group();     scene.add(cpGroup);
 const terrainGroup = new THREE.Group(); scene.add(terrainGroup);
+// the location's own scenery (trees, poles, water...): drawn, never picked,
+// never placed on, never exported — the game adds it from the location file
+const sceneryGroup = new THREE.Group(); scene.add(sceneryGroup);
 const sensorGroup = new THREE.Group(); sensorGroup.visible = false; scene.add(sensorGroup);
 // editor-only template images: reference photos / top-down maps rendered
 // as textured planes under the track. Persisted per-track in localStorage;
@@ -1242,19 +1324,25 @@ let previewHover = null;  // debounce timer for palette-button hover
 (function loop() {
   requestAnimationFrame(loop);
   controls.update();
+  if (skyDome.visible) {            // the sky stays centred on the eye, inside the far plane
+    skyDome.position.copy(camera.position);
+    skyDome.scale.setScalar(camera.far * 0.9);
+  }
   if (!window.__paused) renderer.render(scene, camera);
   if (previewTick) previewTick();
 })();
 
 // ---------------------------------------------------------------------------
-// MRSIM object meshes (real decoded geometry, models/mrsim/*.glb).
-// Only MRSIM's own assets — nothing from VelociDrone.
+// MRSIM object meshes (real decoded geometry, models/mrsim/*.glb), used with
+// the game developer's permission. Only MRSIM's own assets — nothing from
+// VelociDrone. lib/lookalike.js draws an object whose mesh is not listed.
 // ---------------------------------------------------------------------------
 const gltfLoader = new GLTFLoader();
 const texLoader = new THREE.TextureLoader();
 let MODELS = {};
 const templates = new Map();
-try { MODELS = await (await fetch('models/mrsim/models.json')).json(); }
+// revalidate: a cached copy of an older index would hide newly shipped models
+try { MODELS = await (await fetch('models/mrsim/models.json', { cache: 'no-cache' })).json(); }
 catch { console.warn('no models/mrsim/models.json — falling back to collision prims'); }
 
 // --- exact MRSIM materials (Data/Simulations/Multirotor/DroneTrackMaterials.xml).
@@ -1272,7 +1360,15 @@ const MRMAT = {
   FlagPole:  pbr(.05, .05, .05, .5, 0),   // near-black inner pole
   PoleWhite: pbr(.8, .8, .8, .4, 0),
   GateLED:   Object.assign(pbr(.85, .85, .95, .1, 0), { emissive: lin(.5, .5, .7) }),
-  Deco:      pbr(.55, .55, .55, .6, 0),   // launch stands, canopy, misc meshes
+  Deco:      pbr(.55, .55, .55, .6, 0),   // misc meshes
+  // the materials the stand and canopy files define for their own meshes
+  StandRed:  pbr(.3, .005, .005, .1, 0),  // MetalLaunchStand / ChampionshipLaunchStand paint
+  Foam:      pbr(.01, .01, .01, .7, 0),   // stand foam / nylon
+  CanopyFab: pbr(.05, .05, .5, .9, 0),    // ShadeCanopyFabric
+  CanopyLeg: pbr(.5, .5, .5, .1, 0),      // ShadeCanopyLegs
+  CanopyFt:  pbr(.05, .05, .05, .3, 0),   // ShadeCanopyFeet
+  GumWood:   pbr(.3, .2, .075, .6, 0),    // BlueGumWood
+  GumLeaves: pbr(.1, .3, .15, .8, 0),     // BlueGumLeaves
 };
 
 // A doc-local <Material> as a three material. Two definitions matter here:
@@ -1312,20 +1408,27 @@ function atlasTex(file) {
 
 // per-instance atlas sub-rects (u0,v0,du,dv) — from each object's SimC
 // EntitySetRenderInstanceData(entity, 0u, entries[entity % mod]).
-const GATE5_SUB = [[.25,.5,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5],[0,0,.25,.5],[.25,0,.25,.5],[.5,0,.25,.5]];
+// 5x5Gate.xml picks one of the first four atlas panels per gate (initEntity % 4);
+// 5x5StartFinishGate.xml always uses the panel with the red arrows
+const GATE5_SUB = [[.25,.5,.25,.5],[.5,.5,.25,.5],[.75,.5,.25,.5],[0,0,.25,.5]];
+const GATE5_START_SUB = [0,.5,.25,.5];
 const FLAG_SUB  = [[0,0,.5,1],[.25,0,.5,1],[.5,0,.5,1]];
 
 // model -> part name -> material spec (Data/.../DroneTrackInstanceGroups.xml).
 // string = MRMAT key; object = textured (atlas + optional per-instance sub-rect).
 const DIVE = { PVC:'PVC', SquarePanel:'GateSide', FrontPanel:'GateTop', BackPanel:'GateTop' };
 const PART_MAT = {
-  '5x5Gate': { PVC:'PVC', Fabric:{ tex:'5x5GateAtlas.png', sub:GATE5_SUB } },
+  '5x5Gate': { PVC:'PVC', Fabric:{ tex:'5x5GateAtlas.png', sub:GATE5_SUB, startSub:GATE5_START_SUB } },
   '7x6Gate': { PVC:'PVC', TopPanel:'GateTop', TopPanelBack:'GateSide', LeftPanel:'GateSide', RightPanel:'GateSide' },
   '7x7DiveGate': DIVE, '7x7ClimbGate': DIVE,
   'Flag': { Stalk:'FlagStalk', Sleeve:'FlagPole', Flag:{ tex:'FlagAtlas.png', sub:FLAG_SUB } },
   '7x7Mat': { Panel:{ tex:'7x7Mat.png' }, PVC:'PVC' },
   'Champs25Gate': { LEDGate:'GateLED', Gate:'GateSide' },
   'Champs25Pole': { Sleeve:'GateLED', Stalk:'FlagStalk' },
+  'BlueGumTree': { Trunk:'GumWood', Leaves:'GumLeaves' },   // Foliage/BlueGumTreeInstanceGroup.xml
+  'MetalLaunchStand': { Body2:'StandRed', Body3:'Foam', Body4:'Foam' },
+  'ChampionshipLaunchStand': { ChampionshipLaunchStand:'StandRed', FoamChampionshipLaunchStand:'Foam' },
+  'ShadeCanopy': { Fabric:'CanopyFab', Legs:'CanopyLeg', Feet:'CanopyFt' },
   // the drone's own arm LED (RaceLEDs.xml): a 4 cm PCB whose LED strip is lit
   // by DroneRenderingMaterials.xml's PBREmissive "LEDLighting"
   'RaceLEDs': { PCB:'FlagPole', LEDs:'GateLED' },
@@ -1335,33 +1438,51 @@ async function preloadModels(names) {
   await Promise.all([...names].filter(n => MODELS[n] && !templates.has(n)).map(async n => {
     try {
       const gltf = await gltfLoader.loadAsync(MODELS[n].file);
-      gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = o.receiveShadow = true;
+      // cast only: double-sided thin panels that also receive get shadow acne
+      gltf.scene.traverse(o => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = false;
         if (!o.geometry.attributes.normal) o.geometry.computeVertexNormals(); } });
       templates.set(n, gltf.scene);
     } catch (e) { console.warn('model load failed', n, e); }
   }));
 }
 
+// The Champs25 LED colour a macro sets: the colour macro wraps the LightsOff
+// one, so a coloured name in the tags wins.
+function champsLed(tags) {
+  const m = tags.join(' ').match(/Champs25(?:Gate|Pole)(Red|Green|Blue|Yellow|White)/);
+  return m ? m[1].toLowerCase() : 'off';
+}
+// a mesh the editor draws itself: the real game mesh when one is loaded,
+// else the hand-built lookalike (lib/lookalike.js)
+const hasMesh = name => templates.has(name) || LOOKALIKE_NAMES.has(name);
+
 // clone a model template and paint each named part with its real MRSIM material.
 // isStart recolours the gate top banner red; elemIndex varies the atlas artwork.
-function modelInstance(name, elemIndex = 0, isStart = false) {
+function modelInstance(name, elemIndex = 0, isStart = false, tags = []) {
   const tpl = templates.get(name);
-  if (!tpl) return null;
+  if (!tpl) return lookalike(name, THREE, { variant: elemIndex, isStart, led: champsLed(tags) });
   const inst = tpl.clone(true);
   const map = PART_MAT[name];
+  // a Champs25 colour macro lights the LED parts in its own colour
+  const champs = /^Champs25/.test(name) && champsLed(tags);
   inst.traverse(o => {
     if (!o.isMesh) return;
     const part = o.name || o.parent?.name || '';
     let spec = map && map[part];
     if (!spec) { o.material = MRMAT.Deco; return; }
     if (typeof spec === 'string') {
+      if (champs && spec === 'GateLED') {
+        o.material = champs === 'off' ? MATS.dark : matFor('led:' + champs);
+        return;
+      }
       o.material = (isStart && spec === 'GateTop') ? MRMAT.StartTop : MRMAT[spec];
       return;
     }
     // textured part: clone material + a per-instance sub-rect of the atlas
     const t = atlasTex(spec.tex).clone(); t.needsUpdate = true;
     if (spec.sub) {
-      const [u0, v0, du, dv] = spec.sub[elemIndex % spec.sub.length];
+      const [u0, v0, du, dv] = isStart && spec.startSub ? spec.startSub
+        : spec.sub[elemIndex % spec.sub.length];
       t.repeat.set(du, dv);
       t.offset.set(u0, 1 - v0 - dv);       // flipY=false → V measured from top
     }
@@ -1376,21 +1497,34 @@ function modelInstance(name, elemIndex = 0, isStart = false) {
 // ---------------------------------------------------------------------------
 const mkMat = (c, emissive = 0.2, extra = {}) => new THREE.MeshStandardMaterial({
   color: c, roughness: 0.6, emissive: c, emissiveIntensity: emissive, ...extra });
+// the game's own material values (DroneTrackMaterials.xml), linear colour,
+// for objects the game itself draws from primitives (pole gates, hurdles,
+// towers, dive frames) and for anything left without a mesh
+const gm = (r, g, b, rough, metal = 0, extra = {}) => new THREE.MeshStandardMaterial({
+  color: new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace),
+  roughness: rough, metalness: metal, ...extra });
 const MATS = {
-  pvc: mkMat('#f2f2ee'), pad: mkMat('#f5f5f2'),
-  tapeBlue: mkMat('#1b49c8', 0.3), tapeRed: mkMat('#d23b3b', 0.3),
-  dark: mkMat('#23242a', 0), stalk: mkMat('#8b9094', 0.1), sleeve: mkMat('#f5f5f2'),
-  panelTop: mkMat('#eeeeea', 0.22, { side: THREE.DoubleSide }),
-  panelSide: mkMat('#eeeeea', 0.22, { side: THREE.DoubleSide }),
-  padMat: mkMat('#20264f', 0.1),
+  pvc: gm(.5, .5, .5, .1),                           // PVCMaterial
+  pad: gm(.8, .8, .8, .4),                           // PoleGateWhiteInstancingMaterial
+  tapeBlue: gm(0, 0, .5, .2), tapeRed: gm(.5, 0, 0, .2),   // PoleGate*Tape SimC colours
+  dark: gm(.05, .05, .05, .5),                       // FlagPoleMaterial
+  stalk: gm(.5, .5, .5, .2, 1),                      // FlagStalkMaterial
+  sleeve: gm(.05, .05, .05, .5),
+  panelTop: gm(0, 0, .2, .4, 0, { side: THREE.DoubleSide }),    // GateTopMaterial
+  panelSide: gm(.6, .6, .6, .4, 0, { side: THREE.DoubleSide }), // GateSideMaterial
+  padMat: gm(.01, .01, .01, .7),
 };
 const BLOCK_HEX = { Black:'#0d0d0d', White:'#e6e6e6', Red:'#e60000', Orange:'#e67300',
   Yellow:'#e6e600', Green:'#00cc00', Cyan:'#00d9d9', Blue:'#0000e6', Purple:'#8c00e6',
   Pink:'#f280bf', RedPink:'#e61a66', LightBlue:'#0566e6', DarkGreen:'#006619' };
+// Champs25 LED colours (the game's emissive slot is pure R/G/B/RG/RGB)
+const LED_HEX = { red: '#ff2a2a', green: '#2aff4a', blue: '#2a5cff', yellow: '#ffe22a', white: '#ffffff' };
 function matFor(hint) {
   if (MATS[hint]) return MATS[hint];
   const b = hint.match(/^blk:(\w+)$/);
   if (b) return (MATS[hint] = mkMat(BLOCK_HEX[b[1]] || '#9a9a9a', 0.15));
+  const led = hint.match(/^led:(\w+)$/);
+  if (led) return (MATS[hint] = mkMat(LED_HEX[led[1]] || '#ffffff', 0.9));
   return MATS.dark;
 }
 
@@ -1516,7 +1650,7 @@ async function build(data, keepCamera = false) {
     // collision shadow — drawing both doubles up. Sibling prims from OTHER
     // sources (e.g. the importer's riser pole under a lifted flag) still draw.
     const meshSrcs = new Set((el.models || [])
-      .filter(m => templates.has(m.model)).map(m => m.src));
+      .filter(m => hasMesh(m.model)).map(m => m.src));
 
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;
@@ -1546,7 +1680,7 @@ async function build(data, keepCamera = false) {
     });
 
     el.models.forEach(md => {
-      const inst = modelInstance(md.model, ei, el.isStart);
+      const inst = modelInstance(md.model, ei, el.isStart, el.tags);
       if (inst) {
         inst.applyMatrix4(md.matrix);
         inst.traverse(o => { o.userData.elemIndex = ei; });
@@ -1622,6 +1756,7 @@ async function build(data, keepCamera = false) {
 // (same Z-up->Y-up basis as the elements). Falls back to a plane at groundY.
 async function loadTerrain(location, groundY) {
   clearGroup(terrainGroup);
+  clearGroup(sceneryGroup);
   setGridLevel(groundY);
   ground.position.y = groundY - 0.01;
   ground.visible = true;
@@ -1633,11 +1768,77 @@ async function loadTerrain(location, groundY) {
   const terrain = tpl.clone(true);
   terrain.applyMatrix4(Z_UP_TO_Y_UP);
   terrain.traverse(o => { if (o.isMesh) {
+    const part = o.name || o.parent?.name || '';
     o.receiveShadow = true;
-    o.material = new THREE.MeshStandardMaterial({ color: '#3f4a37', roughness: 1 });
+    // the game draws the Hardesty hall with castsShadows="false", and never
+    // renders the finish gate's trigger plane
+    if (/Building/.test(part)) o.castShadow = false;
+    if (/PassageGeometry/.test(part)) o.visible = false;
+    o.material = terrainMat(key, part);
   } });
   terrainGroup.add(terrain);
   ground.visible = false;                            // real terrain replaces the plane
+  await loadScenery(key);
+}
+
+// Terrain parts are named after their material ("WaterTerrain",
+// "SandyPathTerrain"...). Colours are the location file's material values; a
+// textured material uses its texture's average colour times its colour factor.
+// The game's water is a reflective <Water/> shader: here a glossy blue.
+const lin3 = (r, g, b) => new THREE.Color().setRGB(r, g, b, THREE.LinearSRGBColorSpace);
+const TERRAIN_PARTS = {
+  BaylandsPark: [
+    [/^Water/, 'water'],
+    [/^GreenGrass/, [.021, .033, .002]],
+    [/^SandyPath/, [.252, .161, .067]],
+    [/^Asphalt/, [.071, .07, .071]],
+    [/^Concrete|Bathroom/, [.15, .15, .15]],
+    [/./, [.083, .069, .043]],                 // DryGrass: the rest of the park
+  ],
+  HardestyBMXTrack: [
+    [/^Clay/, [.2, .1, .01]],
+    [/^Turns/, [.2, .2, .2]],
+    [/^Concrete/, [.1, .1, .1]],
+    [/^WhitePaint|^FinishGate/, [.6, .6, .6]],
+    [/Building/, [.05, .05, .05]],             // Girders
+    [/./, [.1, .05, .01]],                     // Dirt
+  ],
+};
+const terrainMats = new Map();
+function terrainMat(key, part) {
+  const spec = (TERRAIN_PARTS[key] || []).find(([re]) => re.test(part))?.[1] || [.05, .08, .04];
+  const id = String(spec);
+  if (!terrainMats.has(id)) {
+    terrainMats.set(id, spec === 'water'
+      ? new THREE.MeshStandardMaterial({ color: lin3(.02, .07, .12), roughness: .08, metalness: .4 })
+      : new THREE.MeshStandardMaterial({ color: lin3(...spec), roughness: 1 }));
+  }
+  return terrainMats.get(id);
+}
+
+// Everything else the location file places: Baylands' gum trees, round trees,
+// wooden pole rows, the bridge and the H crossbar. Parsed on its own from the
+// embedded location file and drawn like a preview — the terrain mesh itself is
+// already drawn above, and collision-only shapes are skipped.
+async function loadScenery(key) {
+  const xml = MRSIM_LIB[LIB + 'Locations/' + key + '.xml'];
+  if (!xml) return;
+  let data;
+  try { data = parseMrsim(xml, key + '.xml'); } catch (e) { console.warn('scenery parse failed', key, e); return; }
+  data.elements.forEach(el => {
+    // the trees and the poles share one source file, and the preview hides
+    // prims that share a drawn mesh's source (its collision shadow). Here every
+    // prim has its own renderer, so give the meshes a source of their own.
+    el.models = el.models.filter(m => m.model !== key).map(m => ({ ...m, src: m.src + '#mesh' }));
+    el.prims = el.prims.filter(p => p.shape !== 'poly' || p.verts);
+    el.sensors = [];
+  });
+  const names = new Set();
+  data.elements.forEach(el => el.models.forEach(m => names.add(m.model)));
+  await preloadModels(names);
+  const g = buildPreviewGroup(data, new DOMParser().parseFromString(xml, 'text/xml'));
+  g.traverse(o => { if (o.isMesh) o.castShadow = true; });
+  sceneryGroup.add(g);
 }
 
 function makeLabel(text, pos, color) {
@@ -1661,7 +1862,8 @@ function frameCamera(box) {
     controls.target.copy(c);
     camera.position.set(c.x + r * 0.6, c.y + r * 0.9, c.z + r * 1.1);
     camera.far = r * 8 + 500; camera.updateProjectionMatrix();
-    scene.fog.far = r * 4 + 120;
+    fogBase = r * 4 + 120;
+    applyFog();
   }
   if (projection === 'ortho') { orthoCamera.zoom = 1; fitOrthoFrustum(); }
 }
@@ -1890,6 +2092,7 @@ async function loadFromText(text, fileName, opts = {}) {
   if (opts.keepSelection != null) selectElementByName(opts.keepSelection, true);
   else if (editUi.selectedName) selectElementByName(editUi.selectedName, true);
   renderLapPanel();
+  refreshLocSel(data);
   // expose everything for headless inspection via preview_eval
   window.__mrsim = {
     fileName, meta: data.meta,
@@ -2960,6 +3163,9 @@ function refreshStartRow() {
 // carries it (list "<name>_pass"); null = scenery, no lap entry.
 // ---------------------------------------------------------------------------
 const LIB = '/Data/Simulations/Multirotor/';
+// the six Champs25 macro colours: [macro suffix, palette label]
+const CHAMPS_COLOURS = [['Red', 'red'], ['Green', 'green'], ['Blue', 'blue'],
+  ['Yellow', 'yellow'], ['White', 'white'], ['LightsOff', 'lights off']];
 const PALETTE = [
   { id: 'gate5',   label: '5×5 gate (2.1 m)',  macro: 'Centered5x5Gate', cp: 'wrapper' },
   { id: 'gate7',   label: '7×6 gate (3 m)',    macro: 'Centered7x6Gate', cp: 'wrapper' },
@@ -2967,7 +3173,6 @@ const PALETTE = [
   { id: 'sf7',     label: '7×6 start/finish',  macro: 'Centered7x6StartFinishGate', cp: 'wrapper' },
   { id: 'gatefab', label: 'gate 2 m (fabric)', gateKind: 'fabric', cp: 'pass' },
   { id: 'gatesq',  label: 'gate 2.5 m square', gateKind: 'square', cp: 'pass' },
-  { id: 'champs',  label: 'Champs25 LED gate', include: 'Gates/Champs25Gate.xml', cp: 'wrapper' },
   { id: 'dive',    label: '7×7 dive gate',     include: '7x7DiveGate.xml', cp: 'wrapper' },
   { id: 'climb',   label: '7×7 climb gate',    include: '7x7ClimbGate.xml', cp: 'wrapper' },
   { id: 'divebox', label: '7×7 dive box',      include: '7x7DiveBox.xml', cp: 'wrapper' },
@@ -2979,15 +3184,46 @@ const PALETTE = [
   { id: 'flagR',   label: 'flag + pass R',     flagCombo: 'HalfPlanePassageRight.xml', cp: 'pass' },
   { id: 'flagL',   label: 'flag + pass L',     flagCombo: 'HalfPlanePassageLeft.xml', cp: 'pass' },
   { id: 'check',   label: 'checkpoint (box)',  sensor: true, cp: 'pass' },
-  { id: 'tower5',  label: '5×5 tower',         include: '5x5Tower.xml', cp: null },
-  { id: 'tower7',  label: '7×6 tower',         include: '7x6Tower.xml', cp: null },
+  // pole gates (Gates/PoleGates.xml macros). Each one holds several
+  // checkpoints, listed as dotted names ("edPcube1.frontEntry"); `cpSubs` is
+  // the default lap entry, a straight pass along +Y. Pick others with the
+  // checkpoint selector beside "+ lap".
+  { id: 'pcube',   label: 'pole cube 2 m',     libMacro: 'PipeCube', cp: 'sub',
+    cpSubs: ['frontEntry', 'backExit'] },
+  { id: 'pdcube',  label: 'pole double cube',  libMacro: 'PipeDoubleCube', cp: 'sub',
+    cpSubs: ['lower.frontEntry', 'lower.backExit'] },
+  { id: 'pladder', label: 'pole ladder (2)',   libMacro: 'PipeLadder', cp: 'sub',
+    cpSubs: ['lower.front'] },
+  { id: 'pquad',   label: 'pole ladder (4)',   libMacro: 'PipeQuadrupleLadder', cp: 'sub',
+    cpSubs: ['level1.front'] },
+  // the cube parts on their own, for home-made pole structures. A pole and a
+  // passage are centred on their origin, so lift them to stand on the ground.
+  { id: 'pcubetop', label: 'pole cube top',    libMacro: 'PaddedPoleCubeTop', cp: 'sub',
+    cpSubs: ['frontEntry', 'backExit'] },
+  { id: 'psquare', label: 'pole square (floor)', libMacro: 'PaddedPoleSquare', lift: '.04', cp: null },
+  { id: 'ppole',   label: 'padded pole',       libMacro: 'PaddedPole', lift: '1.04', cp: null },
+  { id: 'ppoleNT', label: 'padded pole (no tape)', libMacro: 'PaddedPoleNoTape', lift: '1.04', cp: null },
+  { id: 'ppass',   label: 'pole passage 2×2',  libMacro: 'PoleSquarePassage', lift: '1.04', cp: 'wrapper' },
+  { id: 'ppassQ',  label: 'pole passage 2×1.5', libMacro: 'PoleQuadrupleLadderPassage', lift: '.79', cp: 'wrapper' },
+  // Champs25 LED gates and poles (Gates/Champs25*.xml macros), one entry per
+  // game colour. The gate is already X-centred, its checkpoint at z 1.27.
+  ...CHAMPS_COLOURS.map(([c, lbl]) => ({ id: 'c25g' + c, label: `Champs25 gate ${lbl}`,
+    libMacro: 'Champs25Gate' + c, libFile: 'Gates/Champs25Gate.xml', cp: 'wrapper' })),
+  ...CHAMPS_COLOURS.map(([c, lbl]) => ({ id: 'c25p' + c, label: `Champs25 pole ${lbl}`,
+    libMacro: 'Champs25Pole' + c, libFile: 'Gates/Champs25Pole.xml', cp: null })),
+  // the game's own flag + one-sided pass (the editor's flagR/flagL equivalent)
+  { id: 'fpassR',  label: 'flag pass R', include: 'FlagPassRight.xml', cp: 'wrapper' },
+  { id: 'fpassL',  label: 'flag pass L', include: 'FlagPassLeft.xml', cp: 'wrapper' },
+  // a tower is a gate on a frame: its gate is a race checkpoint (the official
+  // tracks list every tower), centred like the gates
+  { id: 'tower5',  label: '5×5 tower',         macro: 'Centered5x5Tower', cp: 'wrapper' },
+  { id: 'tower7',  label: '7×6 tower',         macro: 'Centered7x6Tower', cp: 'wrapper' },
   { id: 'hurdle4', label: 'hurdle 4×7',        include: '4x7Hurdle.xml', cp: null },
-  { id: 'carous',  label: 'carousel down',     include: 'CarouselDown.xml', cp: null },
+  // a 5x5 gate with a flag beside it: the gate is the checkpoint
+  { id: 'carous',  label: 'carousel down',     include: 'CarouselDown.xml', cp: 'wrapper' },
   { id: 'divecl',  label: 'dive frame (deco)', include: 'DiveGate.xml', cp: null },
-  { id: 'poleC25', label: 'Champs25 pole',     include: 'Gates/Champs25Pole.xml', cp: null },
   { id: 'flag',    label: 'flag (deco)',       include: 'Flag.xml', cp: null },
   { id: 'flag180', label: 'flag 180 (deco)',   include: 'Flag180.xml', cp: null },
-  { id: 'block',   label: 'start block',       include: 'StartBlock.xml', cp: null },
   { id: 'mat',     label: '7×7 launch mat',    include: '7x7Mat.xml', cp: null },
   { id: 'stand',   label: 'launch stand',      include: 'LaunchStands/MetalLaunchStand.xml', cp: null },
   { id: 'standC',  label: 'champ stand',       include: 'LaunchStands/ChampionshipLaunchStand.xml', cp: null },
@@ -2998,6 +3234,8 @@ const MACRO_SHIFTS = {
   Centered5x5StartFinishGate: ['-1.05', '5x5StartFinishGate.xml'],
   Centered7x6Gate: ['-1.5', '7x6Gate.xml'],
   Centered7x6StartFinishGate: ['-1.5', '7x6StartFinishGate.xml'],
+  Centered5x5Tower: ['-1.05', '5x5Tower.xml'],
+  Centered7x6Tower: ['-1.5', '7x6Tower.xml'],
 };
 
 // ---------------------------------------------------------------------------
@@ -3226,6 +3464,26 @@ function ensureRootInclude(file, ops) {
   inc.setAttribute('file', LIB + file);
   root.insertBefore(inc, root.firstChild);
   ops.push({ type: 'insert', node: inc });
+}
+
+// a library file that only defines macros (pole gates, Champs25) is included
+// once at the root, after the instance groups it draws with: the official
+// tracks put it after the last root-level include
+function ensureLibInclude(file, ops) {
+  const root = rootSim();
+  const includes = [...root.children].filter(c => c.tagName === 'Include');
+  if (includes.some(c => (c.getAttribute('file') || '').endsWith(file))) return;
+  const inc = editState.doc.createElement('Include');
+  inc.setAttribute('file', LIB + file);
+  root.insertBefore(inc, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
+  ops.push({ type: 'insert', node: inc });
+}
+
+// the lap entries a fresh placement adds
+function lapEntriesFor(def, name) {
+  if (def.cp === 'sub') return def.cpSubs.map(s => name + '.' + s);
+  if (def.cp === 'pass') return [name + '_pass'];
+  return def.cp ? [name] : [];
 }
 
 // ---- custom gates (the importer's true-size frames) ----------------------
@@ -3518,6 +3776,17 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     const inst = doc.createElement('Instance');
     inst.setAttribute('macro', def.macro);
     ent.appendChild(inst);
+  } else if (def.libMacro) {
+    ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    ensureLibInclude(def.libFile || 'Gates/PoleGates.xml', ops);
+    const inst = doc.createElement('Instance');
+    inst.setAttribute('macro', def.libMacro);
+    if (def.lift) {
+      const lift = doc.createElement('Transform');
+      lift.setAttribute('z', def.lift);
+      lift.appendChild(inst);
+      ent.appendChild(lift);
+    } else ent.appendChild(inst);
   } else if (def.include) {
     ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
     const inc = doc.createElement('Include');
@@ -3525,15 +3794,25 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     ent.appendChild(inc);
   } else if (def.flagCombo) {
     ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    // the game's own layout (FlagPassRight/Left.xml): the left version turns
+    // the flag 180 degrees, and the pass sits 3 m up
     const flag = doc.createElement('Include');
     flag.setAttribute('file', LIB + 'Flag.xml');
-    ent.appendChild(flag);
+    if (/Left/.test(def.flagCombo)) {
+      const turn = doc.createElement('Transform');
+      turn.setAttribute('rz', '-1'); turn.setAttribute('angleDegrees', '180');
+      turn.appendChild(flag);
+      ent.appendChild(turn);
+    } else ent.appendChild(flag);
+    const lift = doc.createElement('Transform');
+    lift.setAttribute('z', '3');
     const pass = doc.createElement('Entity');
     pass.setAttribute('name', name + '_pass');
     const inc = doc.createElement('Include');
     inc.setAttribute('file', LIB + def.flagCombo);
     pass.appendChild(inc);
-    ent.appendChild(pass);
+    lift.appendChild(pass);
+    ent.appendChild(lift);
   } else if (def.sensor) {
     // bare trigger volume, the importer's pattern: 3 m wide, 2.5 m tall
     const pass = doc.createElement('Entity');
@@ -3561,6 +3840,50 @@ function buildPlacement(def, name, mx, my, mz, ops) {
   ops.push({ type: 'insert', node: tr });
   return tr;
 }
+
+// ---- track location --------------------------------------------------------
+// MRSIM's three locations (Data/Simulations/Multirotor/Locations/). The track
+// picks one with a root <Include>; the editor loads that terrain on rebuild.
+const LOCATIONS = [
+  ['EmptyGrassWorld', 'Empty Grass World'],
+  ['BaylandsPark', 'Baylands Park'],
+  ['HardestyBMXTrack', 'Hardesty BMX Track'],
+];
+const locSelEl = document.getElementById('locSel');
+function locationIncludes() {
+  return editState ? [...editState.doc.getElementsByTagName('Include')]
+    .filter(i => /\/Locations\//.test(i.getAttribute('file') || '')) : [];
+}
+// show the track's location; a track with none (or an unknown one) says so
+function refreshLocSel() {
+  const inc = locationIncludes()[0];
+  const cur = inc ? (inc.getAttribute('file').match(/Locations\/([^/]+)\.xml$/) || [])[1] : null;
+  const known = LOCATIONS.some(([k]) => k === cur);
+  locSelEl.innerHTML = (known ? '' : `<option value="" selected disabled>${cur ? escapeHtml(cur) : 'no location'}</option>`) +
+    LOCATIONS.map(([k, label]) => `<option value="${k}"${k === cur ? ' selected' : ''}>${label}</option>`).join('');
+  locSelEl.disabled = !editState;
+}
+// point the track at another location: rewrite its location include (or add
+// one at the top of the root), as one undo step
+function setLocation(key) {
+  if (!editState || !LOCATIONS.some(([k]) => k === key)) return Promise.resolve('unknown location');
+  const ops = [];
+  const file = LIB + 'Locations/' + key + '.xml';
+  const incs = locationIncludes();
+  if (incs.length) {
+    for (const inc of incs) { ops.push(attrsOp(inc)); inc.setAttribute('file', file); }
+  } else {
+    const inc = editState.doc.createElement('Include');
+    inc.setAttribute('file', file);
+    rootSim().insertBefore(inc, rootSim().firstChild);
+    ops.push({ type: 'insert', node: inc });
+  }
+  pushUndoOps(ops);
+  editState.dirty = true;
+  return rebuildFromDoc();             // keep the camera where it is
+}
+locSelEl.addEventListener('change', () => setLocation(locSelEl.value));
+refreshLocSel();
 
 // ---- checkpoint list (the lap) --------------------------------------------
 function lapNames() {
@@ -3681,10 +4004,7 @@ function placeAt(def, p3) {
   const ops = [];
   const name = uniqueName('ed' + def.id[0].toUpperCase() + def.id.slice(1));
   buildPlacement(def, name, mx, my, mz, ops);
-  if (def.cp) {
-    const entry = def.cp === 'pass' ? name + '_pass' : name;
-    writeLap([...lapNames(), entry], lapIsCircuit(), ops);
-  }
+  if (def.cp) writeLap([...lapNames(), ...lapEntriesFor(def, name)], lapIsCircuit(), ops);
   pushUndoOps(ops);
   editState.dirty = true;
   return rebuildFromDoc().then(() => selectElementByName(name));
@@ -3711,7 +4031,7 @@ function placeAllPalette() {
     buildPlacement(def, name,
       (i % cols) * TEST_GRID_STEP, -Math.floor(i / cols) * TEST_GRID_STEP, 0, ops);
     placed.push(name);
-    if (def.cp) lap.push(def.cp === 'pass' ? name + '_pass' : name);
+    lap.push(...lapEntriesFor(def, name));
   });
   // one lap write for the whole batch, not one per gate
   writeLap(lap, lapIsCircuit(), ops);
@@ -4092,6 +4412,20 @@ function renderLapPanel() {
     `<button data-act="rm" title="remove from lap">✕</button></div>`).join('') ||
     '<div class="hint">no checkpoints in the lap yet — place a gate or select an object and “+ lap”</div>';
   document.getElementById('lapCircuit').checked = lapIsCircuit();
+  refreshLapSub();
+}
+// a multi-checkpoint object (pole cube, ladder) lists each of its checkpoints
+// so "+ lap" can add any one of them; a plain gate hides the selector
+function refreshLapSub() {
+  const sel = document.getElementById('edLapSub');
+  const ei = editUi.selectedName ? elemIndexByName(editUi.selectedName) : -1;
+  const subs = ei >= 0 ? currentData?.elements[ei]?.cpNames || [] : [];
+  sel.style.display = subs.length > 1 ? '' : 'none';
+  if (subs.length < 2) { sel.innerHTML = ''; return; }
+  const keep = sel.value;
+  sel.innerHTML = subs.map(n => `<option value="${escapeHtml(n)}">` +
+    `${escapeHtml(n.split('.').slice(1).join('.'))}</option>`).join('');
+  if (subs.includes(keep)) sel.value = keep;
 }
 document.getElementById('lapList').addEventListener('click', e => {
   const row = e.target.closest('.lapRow');
@@ -4177,7 +4511,9 @@ document.getElementById('lapCircuit').addEventListener('change', e => {
 document.getElementById('edLapAdd').onclick = () => {
   if (!editUi.selectedName) return;
   const ops = [];
-  writeLap([...lapNames(), listNameFor(editUi.selectedName)], lapIsCircuit(), ops);
+  const sub = document.getElementById('edLapSub');
+  const entry = sub.style.display !== 'none' && sub.value ? sub.value : listNameFor(editUi.selectedName);
+  writeLap([...lapNames(), entry], lapIsCircuit(), ops);
   pushUndoOps(ops);
   editState.dirty = true;
   rebuildFromDoc();
@@ -4235,11 +4571,10 @@ document.getElementById('edColThis').onclick = () => applyColor('this');
 document.getElementById('edColType').onclick = () => applyColor('type');
 document.getElementById('edColAll').onclick = () => applyColor('all');
 
-// TEMP: hide built-ins whose .model isn't in the published models.json, so they
-// don't show up as an empty "no mesh" preview. Champs25 gate/pole, the DiveGate
-// deco frame, and the championship launch stand live only in the local overlay.
-// Restore them by emptying this set once the models ship in models.json.
-const HIDDEN_NO_MODEL = new Set(['champs', 'divecl', 'poleC25', 'standC']);
+// built-ins hidden from the palette. Empty now: every built-in draws without
+// its game mesh (collision primitives, or a MODEL_STANDIN box). Add an id here
+// to hide an entry that shows up as an empty preview.
+const HIDDEN_NO_MODEL = new Set();
 
 // the search term is module state rather than being read off the input, so the
 // palette can be re-rendered from anywhere (a component was saved, the shared
@@ -4251,8 +4586,14 @@ const palMatches = def => {
   return palFilter.split(/\s+/).every(t => hay.includes(t));
 };
 
-// palette buttons — built-ins, then a "custom" section of user/repo components,
-// then the "build object" entry point. Re-rendered whenever components change.
+// a palette entry the game itself provides: it references a library file or
+// macro, so the game loads its own model. Everything else is built by the
+// editor from primitives (custom gates, combos, sensors, demo objects).
+const isGameObject = def => !!(def.macro || def.include || def.libMacro);
+
+// palette buttons — the MRSIM objects, the editor's own objects, LED / neon,
+// then "custom" and "community" sections and the "build object" entry point.
+// Re-rendered whenever components change.
 function renderPalette() {
   const pal = document.getElementById('palette');
   if (!pal) return;
@@ -4270,19 +4611,39 @@ function renderPalette() {
     b.addEventListener('mouseleave', () => { clearTimeout(previewHover); hidePreview(); });
     return b;
   };
+  const divider = text => {
+    const div = document.createElement('div');
+    div.className = 'palDivide'; div.textContent = text;
+    pal.appendChild(div);
+  };
   const builtin = PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id) && palMatches(def));
-  builtin.forEach(def => pal.appendChild(mkBtn(def)));
   const allCustom = customDefs();
   // shadowing is by the FULL custom set, not the filtered one — a search must
   // never resurrect a built-in that a custom component has replaced
   const shadowed = new Set(allCustom.map(c => c.id));
   const demo = DEMO_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
-  demo.forEach(def => pal.appendChild(mkBtn(def)));
+  // the game's own objects first, then the ones the editor builds itself
+  const game = builtin.filter(isGameObject);
+  const editorMade = [...builtin.filter(d => !isGameObject(d)), ...demo];
+  if (game.length) {
+    divider('MRSIM objects');
+    game.forEach(def => {
+      const b = mkBtn(def);
+      b.title += ' · built into MRSIM: the game loads its own model';
+      pal.appendChild(b);
+    });
+  }
+  if (editorMade.length) {
+    divider('editor objects');
+    editorMade.forEach(def => {
+      const b = mkBtn(def);
+      b.title += ' · made by the editor from shapes, not a game object';
+      pal.appendChild(b);
+    });
+  }
   const neon = NEON_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
   if (neon.length) {
-    const div = document.createElement('div');
-    div.className = 'palDivide'; div.textContent = 'LED / neon';
-    pal.appendChild(div);
+    divider('LED / neon');
     neon.forEach(def => {
       const b = mkBtn(def);
       b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
@@ -4420,7 +4781,7 @@ function buildPreviewGroup(data, doc) {
   const g = new THREE.Group();
   const V = new THREE.Vector3(), matCache = new Map();
   data.elements.forEach((el, ei) => {
-    const meshSrcs = new Set((el.models || []).filter(m => templates.has(m.model)).map(m => m.src));
+    const meshSrcs = new Set((el.models || []).filter(m => hasMesh(m.model)).map(m => m.src));
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;         // collision shadow of a rendered mesh
       const mat = previewDocMat(doc, p.material, matCache) || matFor(p.hint);
@@ -4439,7 +4800,7 @@ function buildPreviewGroup(data, doc) {
       g.add(mesh);
     });
     el.models.forEach(md => {
-      const inst = modelInstance(md.model, ei, el.isStart);
+      const inst = modelInstance(md.model, ei, el.isStart, el.tags);
       if (inst) { inst.applyMatrix4(md.matrix); g.add(inst); }
     });
     (el.sensors || []).forEach(sn => {
@@ -5574,6 +5935,7 @@ window.__edit = {
   mirror: axis => mirrorTrack(axis),        // 'x' | 'y' | 'z' — mirror whole track
   shiftZ: dz => shiftTrackZ(dz),            // translate every object by dz metres in z
   newTrack: () => newBlankTrack(),
+  location: key => key ? setLocation(key) : (currentData?.meta.location || null),
   newLensCal: opts => newLensCalTrack(opts || {}),   // lib/lens-cal.js fields, metres
   importText: (text, name) => document.getElementById('file').onchange
     ? (async () => { if (/\.(trk|json)$/i.test(name)) {

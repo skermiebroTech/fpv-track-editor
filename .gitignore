@@ -11,13 +11,35 @@
 # lens-cal.js builds the lens calibration track from the "new" popover;
 # imported on every page load too.
 !/lib/lens-cal.js
+# lookalike.js builds the hand-made stand-ins for the game's meshes;
+# imported on every page load too.
+!/lib/lookalike.js
 
-# MRSIM object meshes/textures decoded from MRSIM.dkb are the game
-# developer's copyrighted assets. Never redistributed. The published
-# editor renders these objects procedurally from their collision
-# primitives; the .glb files stay local as a cache.
+# MRSIM meshes/textures decoded from MRSIM.dkb belong to the game's
+# developer, who allowed their use here. Only the track objects, the
+# location terrains and their textures ship (listed in models.json);
+# drone airframes, menus and the rest stay local.
 models/mrsim/*
 !models/mrsim/models.json
+!models/mrsim/5x5Gate.glb
+!models/mrsim/7x6Gate.glb
+!models/mrsim/7x7DiveGate.glb
+!models/mrsim/7x7ClimbGate.glb
+!models/mrsim/7x7Mat.glb
+!models/mrsim/Flag.glb
+!models/mrsim/Champs25Gate.glb
+!models/mrsim/Champs25Pole.glb
+!models/mrsim/MetalLaunchStand.glb
+!models/mrsim/ChampionshipLaunchStand.glb
+!models/mrsim/ShadeCanopy.glb
+!models/mrsim/BlueGumTree.glb
+!models/mrsim/BaylandsPark.glb
+!models/mrsim/HardestyBMXTrack.glb
+!models/mrsim/tex/
+models/mrsim/tex/*
+!models/mrsim/tex/5x5GateAtlas.png
+!models/mrsim/tex/FlagAtlas.png
+!models/mrsim/tex/7x7Mat.png
 
 # node deps if you install anything for local tooling; the editor itself
 # runs from a CDN import map with no build step.

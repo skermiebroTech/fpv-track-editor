@@ -1,1 +1,265 @@
-{}
+{
+ "5x5Gate": {
+  "file": "models/mrsim/5x5Gate.glb",
+  "parts": [
+   "Fabric",
+   "PVC"
+  ],
+  "min": [
+   -0.02,
+   -0.02,
+   0.0
+  ],
+  "max": [
+   2.12,
+   0.02,
+   1.82
+  ]
+ },
+ "7x6Gate": {
+  "file": "models/mrsim/7x6Gate.glb",
+  "parts": [
+   "LeftPanel",
+   "RightPanel",
+   "TopPanel",
+   "PVC",
+   "TopPanelBack"
+  ],
+  "min": [
+   -0.02,
+   -0.02,
+   0.0
+  ],
+  "max": [
+   3.02,
+   0.02,
+   2.32
+  ]
+ },
+ "7x7DiveGate": {
+  "file": "models/mrsim/7x7DiveGate.glb",
+  "parts": [
+   "SquarePanel",
+   "FrontPanel",
+   "BackPanel",
+   "PVC"
+  ],
+  "min": [
+   -1.52,
+   -1.52,
+   -0.02
+  ],
+  "max": [
+   1.52,
+   1.52,
+   0.02
+  ]
+ },
+ "7x7ClimbGate": {
+  "file": "models/mrsim/7x7ClimbGate.glb",
+  "parts": [
+   "SquarePanel",
+   "FrontPanel",
+   "BackPanel",
+   "PVC"
+  ],
+  "min": [
+   -1.37,
+   -1.37,
+   -0.02
+  ],
+  "max": [
+   1.37,
+   1.37,
+   0.02
+  ]
+ },
+ "7x7Mat": {
+  "file": "models/mrsim/7x7Mat.glb",
+  "parts": [
+   "Panel",
+   "PVC"
+  ],
+  "min": [
+   -1.52,
+   -1.52,
+   0.0
+  ],
+  "max": [
+   1.52,
+   1.52,
+   0.04
+  ]
+ },
+ "Flag": {
+  "file": "models/mrsim/Flag.glb",
+  "parts": [
+   "Flag",
+   "Stalk",
+   "Sleeve"
+  ],
+  "min": [
+   -0.807,
+   -0.04,
+   -0.5
+  ],
+  "max": [
+   0.04,
+   0.04,
+   4.041
+  ]
+ },
+ "Champs25Gate": {
+  "file": "models/mrsim/Champs25Gate.glb",
+  "parts": [
+   "Gate",
+   "LEDGate"
+  ],
+  "min": [
+   -1.271,
+   -0.27,
+   -0.001
+  ],
+  "max": [
+   1.271,
+   0.25,
+   2.541
+  ]
+ },
+ "Champs25Pole": {
+  "file": "models/mrsim/Champs25Pole.glb",
+  "parts": [
+   "Stalk",
+   "Sleeve"
+  ],
+  "min": [
+   -0.048,
+   -0.048,
+   -0.5
+  ],
+  "max": [
+   0.048,
+   0.048,
+   3.5
+  ]
+ },
+ "MetalLaunchStand": {
+  "file": "models/mrsim/MetalLaunchStand.glb",
+  "parts": [
+   "Body2",
+   "Body3",
+   "Body4"
+  ],
+  "min": [
+   -0.093,
+   0.0,
+   0.0
+  ],
+  "max": [
+   0.093,
+   0.25,
+   0.075
+  ]
+ },
+ "ChampionshipLaunchStand": {
+  "file": "models/mrsim/ChampionshipLaunchStand.glb",
+  "parts": [
+   "ChampionshipLaunchStand",
+   "FoamChampionshipLaunchStand"
+  ],
+  "min": [
+   -0.2,
+   -0.05,
+   0.0
+  ],
+  "max": [
+   0.2,
+   0.45,
+   0.862
+  ]
+ },
+ "ShadeCanopy": {
+  "file": "models/mrsim/ShadeCanopy.glb",
+  "parts": [
+   "Fabric",
+   "Feet",
+   "Legs"
+  ],
+  "min": [
+   -1.524,
+   -1.524,
+   0.0
+  ],
+  "max": [
+   1.524,
+   1.524,
+   2.993
+  ]
+ },
+ "BlueGumTree": {
+  "file": "models/mrsim/BlueGumTree.glb",
+  "parts": [
+   "Trunk",
+   "Leaves"
+  ],
+  "min": [
+   -9.604,
+   -11.962,
+   0.0
+  ],
+  "max": [
+   7.797,
+   9.55,
+   29.348
+  ]
+ },
+ "BaylandsPark": {
+  "file": "models/mrsim/BaylandsPark.glb",
+  "parts": [
+   "Terrain",
+   "SandyPathTerrain",
+   "GreenGrassTerrain",
+   "ConcreteTerrain",
+   "AsphaltTerrain",
+   "WaterTerrain",
+   "PlaygroundBathroom",
+   "SWBathroom",
+   "SEBathroom"
+  ],
+  "min": [
+   -411.632,
+   -274.094,
+   -0.854
+  ],
+  "max": [
+   749.709,
+   548.176,
+   5.466
+  ]
+ },
+ "HardestyBMXTrack": {
+  "file": "models/mrsim/HardestyBMXTrack.glb",
+  "parts": [
+   "Hardesty_Bmx_Track",
+   "ConcreteHardesty_Bmx_Track",
+   "ClayHardesty_Bmx_Track",
+   "TurnsHardesty_Bmx_Track",
+   "Hardesty_BMX_Building",
+   "WhitePaintHardesty_BMX_Building",
+   "FinishGateFlag",
+   "FinishGateLeft",
+   "FinishGateRight",
+   "FinishGatePassageGeometry"
+  ],
+  "min": [
+   -43.108,
+   -87.52,
+   -0.5
+  ],
+  "max": [
+   48.894,
+   63.12,
+   20.45
+  ]
+ }
+}
