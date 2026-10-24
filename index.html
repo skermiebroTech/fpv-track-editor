@@ -42,6 +42,58 @@
     --bar-h: 38px;
     --panel-top: calc(var(--bar-h) + 6px);
     --panel-max-h: calc(100vh - var(--bar-h) - 18px);
+    /* chrome colours that used to be written inline, so the light theme can
+       restate them in one place */
+    --bar-bg: linear-gradient(#0d0f14f2, #0d0f14cc);
+    --edit-line: #3f5330;       /* edge of the edit panel and its popups */
+    --edit-hover: #d6f0ad;
+    --line-hover: #46516b;      /* field edge under the pointer */
+    --hover-tint: #ffffff08;    /* list row under the pointer */
+    --danger-bg: #2e1a1a;
+    --danger-on: #4a1e1e;
+    --ok-line: #2f4a37;  --ok-bg: #1a2a20;
+    --warn-line: #5a3f28; --warn-bg: #2a2118;
+    --part-bg: #191d29;
+    --scroll-track: #0f1219; --scroll-thumb: #3d4761; --scroll-thumb-hover: #566180;
+  }
+  /* Light panels (environment popover: "panels"). Only the HTML chrome
+     changes: the 3D scene keeps its own editor or game look. The filled
+     accent and edit colours stay dark enough to carry white text. */
+  :root[data-ui="light"] {
+    color-scheme: light;
+    --bg: #e9edf2;
+    --surface: #f7f8fa;
+    --surface-2: #ffffff;
+    --surface-3: #e8ecf2;
+    --line: #c4ccd8;
+    --line-2: #c0c8d4;
+    --line-3: #dde2e9;
+    --text: #1b212d;
+    --text-strong: #0a0d13;
+    --dim: #4c5568;
+    --faint: #626b7e;
+    --accent: #2563d6;
+    --accent-bg: #2563d6;
+    --edit: #47902a;
+    --edit-text: #2c6611;
+    --edit-bg: #3f8424;
+    --danger: #cf3434;
+    --danger-text: #b42b2b;
+    --warn: #a95a12;
+    --ok: #1f7f43;
+    --glow: #a87b00;
+    --shadow: 0 10px 30px #1a243a33, 0 2px 6px #1a243a26;
+    --bar-bg: linear-gradient(#f7f8faf2, #f7f8fadd);
+    --edit-line: #a9c98f;
+    --edit-hover: #1f5209;
+    --line-hover: #9aa5b6;
+    --hover-tint: #0000000a;
+    --danger-bg: #fbe5e5;
+    --danger-on: #f7d3d3;
+    --ok-line: #9fcfb0;  --ok-bg: #e3f4e9;
+    --warn-line: #e2bf98; --warn-bg: #fbeedd;
+    --part-bg: #f1f3f7;
+    --scroll-track: #eef1f5; --scroll-thumb: #b9c2d0; --scroll-thumb-hover: #97a2b4;
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden;
@@ -66,7 +118,7 @@
   /* ---- controls bar ---- */
   #bar { position: fixed; top: 0; left: 0; right: 0; z-index: 5;
     display: flex; flex-wrap: wrap; gap: 6px 7px; align-items: center; padding: 7px 10px;
-    background: linear-gradient(#0d0f14f2, #0d0f14cc);
+    background: var(--bar-bg);
     border-bottom: 1px solid var(--line-3); backdrop-filter: blur(6px); }
   #bar select, #bar button, #bar label.file {
     background: var(--surface-2); color: var(--text); border: 1px solid var(--line-2);
@@ -78,7 +130,7 @@
   #bar button:disabled { opacity: .3; cursor: default; }
   #bar button:disabled:hover { background: var(--surface-2); border-color: var(--line-2); }
   #bar button.hist { padding: 4px 9px; font-size: 15px; line-height: 1.1; }
-  #bar .title { font-weight: 600; color: #fff; margin-right: 4px; letter-spacing: .01em; }
+  #bar .title { font-weight: 600; color: var(--text-strong); margin-right: 4px; letter-spacing: .01em; }
   /* Controls sit in groups (file, view, scene, edit). A group never splits:
      when the window is too narrow for one row, whole groups wrap onto a second
      row instead of the right end of the bar going off-screen. Each control
@@ -97,10 +149,10 @@
 
   /* diagnostics is a validity chip that opens the panel, not a panel that is
      always open — the count is filled in by refreshDiagChip() after each load */
-  #bar button.diagchip.ok { color: var(--ok); border-color: #2f4a37; }
-  #bar button.diagchip.ok:hover { border-color: var(--ok); background: #1a2a20; }
-  #bar button.diagchip.warn { color: var(--warn); border-color: #5a3f28; }
-  #bar button.diagchip.warn:hover { border-color: var(--warn); background: #2a2118; }
+  #bar button.diagchip.ok { color: var(--ok); border-color: var(--ok-line); }
+  #bar button.diagchip.ok:hover { border-color: var(--ok); background: var(--ok-bg); }
+  #bar button.diagchip.warn { color: var(--warn); border-color: var(--warn-line); }
+  #bar button.diagchip.warn:hover { border-color: var(--warn); background: var(--warn-bg); }
   #bar button.diagchip.on { background: var(--surface-3); }
 
   /* every floating panel shares one surface, so they read as one system and a
@@ -176,13 +228,13 @@
   #tplPanel .tplAddRow label { flex: 1 1 auto; background: var(--surface-2); color: var(--text);
     border: 1px dashed var(--line-2); border-radius: var(--r-sm); padding: 6px 8px; cursor: pointer;
     text-align: center; font-size: 11.5px; }
-  #tplPanel .tplAddRow label:hover { border-color: var(--accent); color: #fff; }
+  #tplPanel .tplAddRow label:hover { border-color: var(--accent); color: var(--text-strong); }
   #tplPanel .tplAddRow input[type=file] { display: none; }
   #tplPanel .tplItem { background: var(--surface-2); border: 1px solid var(--line-2);
     border-radius: var(--r-sm); padding: 7px 8px; margin-bottom: 8px; }
   #tplPanel .tplItem.selected { border-color: #ffcc33; box-shadow: 0 0 0 1px #ffcc3355; }
   #tplPanel .tplName { cursor: pointer; }
-  #tplPanel .tplName:hover { color: #fff; }
+  #tplPanel .tplName:hover { color: var(--text-strong); }
   #tplPanel .tplItem.hidden-body .tplBody { display: none; }
   #tplPanel .tplHead { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   #tplPanel .tplHead .tplThumb { width: 26px; height: 26px; object-fit: cover; border-radius: 3px;
@@ -233,7 +285,7 @@
   /* ---- diagnostics panel ---- */
   #diag { right: 10px; width: 380px; max-height: var(--panel-max-h); overflow: auto; }
   #diag.hidden { display: none; }
-  #diag h1 { font-size: 14px; margin: 0 0 2px; color: #fff; }
+  #diag h1 { font-size: 14px; margin: 0 0 2px; color: var(--text-strong); }
   #diag .sub { color: var(--dim); margin-bottom: 9px; }
   #diag section { border-top: 1px solid var(--line-3); padding: 8px 0; }
   #diag section:first-of-type { border-top: none; }
@@ -256,17 +308,17 @@
   /* the corner hints float straight over the scene, so they need their own
      backing now that the sky can be any colour the user likes */
   #legend, #ctrlLegend { display: none; position: fixed; left: 10px; z-index: 5; color: var(--dim);
-    background: #0d0f14bb; border-radius: var(--r-sm); padding: 2px 6px;
+    background: color-mix(in srgb, var(--bg) 73%, transparent); border-radius: var(--r-sm); padding: 2px 6px;
     backdrop-filter: blur(3px); }
   #legend { bottom: 8px; }
   #ctrlLegend { bottom: 28px; }
-  #ctrlLegend b { color: #c3ccdd; font-weight: 600; }
+  #ctrlLegend b { color: var(--text); font-weight: 600; }
 
   /* ---- edit panel ---- */
   /* green edge and green section headings: the panel itself says "edit mode is
      on", so the mode is never something you have to remember */
   #editPanel { left: 10px; width: 272px; max-height: var(--panel-max-h);
-    overflow: auto; border-color: #3f5330; display: none; }
+    overflow: auto; border-color: var(--edit-line); display: none; }
   #editPanel.show { display: block; }
   #editPanel.noSel #edXform { display: none; }
   #editPanel h3, #editPanel details.edSect > summary {
@@ -275,7 +327,7 @@
     border-top: 1px solid var(--line-3); padding-top: 9px; }
   #editPanel details.edSect { margin: 0; }
   #editPanel details.edSect > summary { cursor: pointer; }
-  #editPanel details.edSect > summary:hover { color: #d6f0ad; }
+  #editPanel details.edSect > summary:hover { color: var(--edit-hover); }
   #editPanel details.edSect > summary span { color: var(--faint); font-weight: 400;
     text-transform: none; letter-spacing: 0; }
   #editPanel .pal { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
@@ -293,8 +345,8 @@
   #editPanel .lapRow { display: flex; align-items: center; gap: 5px; padding: 2px 3px;
     border-radius: var(--r-sm); font-size: 11.5px;
     border-top: 2px solid transparent; border-bottom: 2px solid transparent; }
-  #editPanel .lapRow:hover { background: #ffffff08; }
-  #editPanel .lapRow .grip { color: #56607a; cursor: grab; flex: 0 0 auto;
+  #editPanel .lapRow:hover { background: var(--hover-tint); }
+  #editPanel .lapRow .grip { color: var(--faint); cursor: grab; flex: 0 0 auto;
     font-size: 10px; letter-spacing: -1px; user-select: none; }
   #editPanel .lapRow .grip:hover { color: var(--edit-text); }
   #editPanel .lapRow.dragging { opacity: .35; }
@@ -302,12 +354,12 @@
   #editPanel .lapRow.dropAfter { border-bottom-color: var(--edit); }
   #editPanel .lapRow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis;
     white-space: nowrap; cursor: pointer; }
-  #editPanel .lapRow .nm:hover { color: #fff; }
+  #editPanel .lapRow .nm:hover { color: var(--text-strong); }
   #editPanel .lapRow.sel { background: #86c4521f; }
   #editPanel .lapRow.sel .nm { color: var(--edit-text); }
   #editPanel .lapRow button { background: none; border: none; color: var(--faint);
     cursor: pointer; padding: 0 2px; font: inherit; }
-  #editPanel .lapRow button:hover { color: #fff; }
+  #editPanel .lapRow button:hover { color: var(--text-strong); }
   #editPanel .btnRow { display: flex; gap: 5px; margin-top: 7px; }
   #editPanel .btnRow button { flex: 1; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 0; font: inherit;
@@ -316,9 +368,9 @@
   #editPanel .btnRow select { flex: 1.4; min-width: 0; background: var(--surface-2);
     color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
     font: inherit; font-size: 11.5px; }
-  #editPanel .btnRow button.danger:hover { background: #2e1a1a;
+  #editPanel .btnRow button.danger:hover { background: var(--danger-bg);
     border-color: var(--danger); color: var(--danger-text); }
-  #editPanel .btnRow button.on { background: #4a1e1e; border-color: var(--danger); color: #ff9a8a; }
+  #editPanel .btnRow button.on { background: var(--danger-on); border-color: var(--danger); color: var(--danger-text); }
   #editPanel .btnRow button:disabled { opacity: .4; cursor: default;
     background: var(--surface-2); border-color: var(--line-2); }
   #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 6px;
@@ -345,7 +397,7 @@
   #editPanel #savedCols { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; min-height: 18px; align-items: center; }
   #editPanel #savedCols .sc { width: 18px; height: 18px; border-radius: 4px;
     border: 1px solid var(--line-2); cursor: pointer; padding: 0; }
-  #editPanel #savedCols .sc:hover { border-color: #fff; }
+  #editPanel #savedCols .sc:hover { border-color: var(--text-strong); }
   #editPanel #savedCols .none { color: var(--faint); font-size: 10.5px; }
   #editPanel #saveCol { flex: 0 0 auto; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--line-2); border-radius: 4px; width: 22px; height: 20px;
@@ -361,7 +413,7 @@
   #editPanel .row input { min-width: 0; }
   #editPanel input { flex: 1; width: 60px; background: var(--surface-2); color: var(--text);
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 4px 7px; font: inherit; }
-  #editPanel input:hover { border-color: #46516b; }
+  #editPanel input:hover { border-color: var(--line-hover); }
   #editPanel input:focus { border-color: var(--accent); outline: none;
     box-shadow: 0 0 0 2px #5a8dff33; }
   #editPanel .locked { color: var(--danger-text); }
@@ -406,7 +458,7 @@
   #palPreview { position: fixed; z-index: 8; width: 312px; display: none;
     background: var(--surface);
     background: color-mix(in srgb, var(--surface) 96%, transparent);
-    border: 1px solid #3f5330; border-radius: var(--r-lg);
+    border: 1px solid var(--edit-line); border-radius: var(--r-lg);
     padding: 6px; box-shadow: var(--shadow); backdrop-filter: blur(10px);
     pointer-events: none; }
   #palPreview.show { display: block; }
@@ -418,7 +470,7 @@
   #palPreview.empty .cap::after { content: ' · no mesh'; color: var(--faint); }
 
   /* ---- palette custom section ---- */
-  #editPanel .pal button.custom { border-color: #3f5330; }
+  #editPanel .pal button.custom { border-color: var(--edit-line); }
   #editPanel .pal button.custom:hover { border-color: var(--edit-text); }
   #editPanel .pal button.community { border-color: #4a3f6b; }
   #editPanel .pal button.community:hover { border-color: var(--edit-text); }
@@ -451,12 +503,12 @@
   #builder .bList, #builder .bForm, #builder .bPrev { min-height: 0; min-width: 0; }
   #builder .bHead { grid-column: 1 / -1; display: flex; align-items: center; gap: 10px;
     padding: 12px 16px; border-bottom: 1px solid var(--line-3); }
-  #builder .bHead h2 { font-size: 15px; margin: 0; color: #fff; }
+  #builder .bHead h2 { font-size: 15px; margin: 0; color: var(--text-strong); }
   #builder .bHead .sub { color: var(--dim); }
   #builder .bHead .x { margin-left: auto; background: var(--surface-2);
     border: 1px solid var(--line-2); color: var(--text); border-radius: var(--r-sm);
     padding: 5px 11px; cursor: pointer; font: inherit; }
-  #builder .bHead .x:hover { background: #2e1a1a; border-color: var(--danger);
+  #builder .bHead .x:hover { background: var(--danger-bg); border-color: var(--danger);
     color: var(--danger-text); }
   /* Explicit scroll bars on every panel that can outgrow its box. Styling
      ::-webkit-scrollbar also opts these elements out of the overlay
@@ -468,13 +520,13 @@
   #builder .bList::-webkit-scrollbar, #builder .bForm::-webkit-scrollbar,
   #editPanel::-webkit-scrollbar, #diag::-webkit-scrollbar { width: 12px; height: 12px; }
   #builder .bList::-webkit-scrollbar-track, #builder .bForm::-webkit-scrollbar-track,
-  #editPanel::-webkit-scrollbar-track, #diag::-webkit-scrollbar-track { background: #0f1219; }
+  #editPanel::-webkit-scrollbar-track, #diag::-webkit-scrollbar-track { background: var(--scroll-track); }
   #builder .bList::-webkit-scrollbar-thumb, #builder .bForm::-webkit-scrollbar-thumb,
   #editPanel::-webkit-scrollbar-thumb, #diag::-webkit-scrollbar-thumb {
-    background: #3d4761; border-radius: 6px; border: 2px solid #0f1219; }
+    background: var(--scroll-thumb); border-radius: 6px; border: 2px solid var(--scroll-track); }
   #builder .bList::-webkit-scrollbar-thumb:hover, #builder .bForm::-webkit-scrollbar-thumb:hover,
   #editPanel::-webkit-scrollbar-thumb:hover, #diag::-webkit-scrollbar-thumb:hover {
-    background: #566180; }
+    background: var(--scroll-thumb-hover); }
   #builder .bList { grid-row: 2 / 3; border-right: 1px solid var(--line-3);
     overflow: auto; padding: 9px; }
   #builder .bList h3 { font-size: 10.5px; color: var(--dim); margin: 5px 0 7px; font-weight: 500;
@@ -504,7 +556,7 @@
   #builder .bFoot button.primary { background: var(--edit-bg); border-color: var(--edit);
     color: #eaf7dc; font-weight: 600; }
   #builder .bFoot button.primary:hover { background: #35601f; border-color: var(--edit-text); }
-  #builder .bFoot button.danger:hover { background: #2e1a1a; border-color: var(--danger);
+  #builder .bFoot button.danger:hover { background: var(--danger-bg); border-color: var(--danger);
     color: var(--danger-text); }
   #builder .bFoot .spacer { flex: 1; }
   #builder .bFoot .saveMsg { color: var(--edit); font-size: 11.5px; }
@@ -513,7 +565,7 @@
   #builder input[type=text], #builder input[type=number] { background: var(--surface-2);
     color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
     padding: 5px 7px; font: inherit; width: 100%; }
-  #builder input:hover { border-color: #46516b; }
+  #builder input:hover { border-color: var(--line-hover); }
   /* own up/down steppers on the part cards' number fields — native spinners
      are hidden globally and render inconsistently across browsers anyway */
   #builder .nw { position: relative; display: flex; min-width: 0; }
@@ -523,19 +575,19 @@
   #builder .nw .stp button { flex: 1; padding: 0; border: none; border-radius: 2px;
     background: var(--surface-3); color: var(--dim); cursor: pointer;
     font-size: 6.5px; line-height: 1; }
-  #builder .nw .stp button:hover { background: #3a445e; color: #fff; }
+  #builder .nw .stp button:hover { background: var(--line-hover); color: var(--text-strong); }
   #builder input:focus { border-color: var(--accent); outline: none;
     box-shadow: 0 0 0 2px #5a8dff33; }
   #builder .parts { border-top: 1px solid var(--line-3); margin-top: 12px; padding-top: 10px; }
   #builder .parts h3 { font-size: 10.5px; color: var(--edit-text); margin: 0 0 8px;
     text-transform: uppercase; letter-spacing: .07em; }
   #builder .part { border: 1px solid var(--line); border-radius: var(--r); padding: 8px 9px;
-    margin-bottom: 8px; background: #191d29; }
-  #builder .part:hover { border-color: #38415a; }
+    margin-bottom: 8px; background: var(--part-bg); }
+  #builder .part:hover { border-color: var(--line-hover); }
   #builder .part.sel { border-color: var(--edit); box-shadow: 0 0 0 1px var(--edit); }
   #builder .part .ph { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
   #builder .part .ph .tag { background: var(--surface-3); border: 1px solid var(--line-2);
-    border-radius: var(--r-sm); padding: 2px 7px; font-size: 10.5px; color: #a7b0c4; }
+    border-radius: var(--r-sm); padding: 2px 7px; font-size: 10.5px; color: var(--dim); }
   #builder .part .ph input[type=color] { width: 26px; height: 22px; padding: 0;
     border: 1px solid var(--line-2); border-radius: var(--r-sm); background: none;
     cursor: pointer; flex: 0 0 auto; }
@@ -558,7 +610,7 @@
   #builder .part .grid3 input { padding: 3px 5px; font-size: 11px; }
   #builder .addRow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
   #builder .addRow button { flex: 1 0 30%; background: var(--surface-2); color: var(--dim);
-    border: 1px dashed #414b64; border-radius: var(--r-sm); padding: 6px 0;
+    border: 1px dashed var(--line-2); border-radius: var(--r-sm); padding: 6px 0;
     font: inherit; font-size: 11.5px; cursor: pointer; }
   #builder .addRow button:hover { background: var(--surface-3); border-color: var(--edit);
     color: var(--edit-text); }
@@ -571,7 +623,7 @@
     z-index: 6; display: none; width: min(580px, calc(100vw - 20px));
     background: var(--surface);
     background: color-mix(in srgb, var(--surface) 94%, transparent);
-    border: 1px solid #5a3f28; border-left: 3px solid var(--warn);
+    border: 1px solid var(--warn-line); border-left: 3px solid var(--warn);
     border-radius: var(--r-lg); padding: 11px 13px;
     backdrop-filter: blur(10px); box-shadow: var(--shadow); }
   #migrate.show { display: flex; gap: 11px; align-items: flex-start; }
@@ -592,7 +644,7 @@
   #notice .sheet { width: min(440px, 92vw); background: var(--surface);
     border: 1px solid var(--line); border-radius: var(--r-lg); padding: 18px 20px 16px;
     box-shadow: 0 28px 90px #000000b3; }
-  #notice h2 { font-size: 15px; margin: 0 0 8px; color: #fff; }
+  #notice h2 { font-size: 15px; margin: 0 0 8px; color: var(--text-strong); }
   #notice p { margin: 0 0 14px; color: var(--text); line-height: 1.55; }
   #notice button { display: block; margin-left: auto; background: var(--accent-bg);
     border: 1px solid var(--accent); color: #fff; border-radius: var(--r-sm);
@@ -630,6 +682,15 @@
     background: var(--surface-3); border: 1px solid var(--line-2);
     border-bottom-width: 2px; border-radius: 4px; }
 </style>
+<script>
+// panel theme before the first paint, so a light-panel user never sees a dark
+// flash. Mirrors applyUiTheme() in the module ("auto" = light with the game look).
+try {
+  const t = localStorage.getItem('mrsim.uiTheme');
+  const game = (JSON.parse(localStorage.getItem('mrsim.env') || '{}')).look === 'game';
+  if (t === 'light' || (t === 'auto' && game)) document.documentElement.dataset.ui = 'light';
+} catch {}
+</script>
 
 <div id="app"></div>
 <div id="bar">
@@ -725,6 +786,14 @@
     <label for="groundColor">ground</label>
     <span class="envHint">the floor plane at z = 0</span>
     <input id="groundColor" class="swatch" type="color" value="#151922" title="ground colour">
+  </div>
+  <div class="envRow">
+    <label for="uiTheme">panels</label>
+    <select id="uiTheme" title="colours of the toolbar and the panels (the 3D scene does not change)">
+      <option value="dark">dark</option>
+      <option value="light">light</option>
+      <option value="auto">light with the game look</option>
+    </select>
   </div>
   <button id="envReset" class="envReset" title="back to the editor's default look">↺ reset to defaults</button>
 </div>
@@ -900,7 +969,7 @@
       <div class="fRow"><label title="credited on hover and written into every export — remembered for your next object">author</label>
         <input type="text" id="bAuthor" placeholder="your name or GitHub handle" maxlength="40"></div>
       <div class="cpRow"><input type="checkbox" id="bCp">
-        <label for="bCp" style="width:auto;color:#b7e07a">race checkpoint (joins the lap when placed)</label></div>
+        <label for="bCp" style="width:auto;color:var(--edit-text)">race checkpoint (joins the lap when placed)</label></div>
       <div id="bPassRow" class="fRow" style="display:none">
         <label title="fly-through trigger box: width × depth × height, centre height">gate w×d×h·z</label>
         <input type="number" id="bPassW" step="0.1" min="0.2" title="trigger width" style="width:52px">
@@ -908,9 +977,9 @@
         <input type="number" id="bPassH" step="0.1" min="0.2" title="trigger height" style="width:52px">
         <input type="number" id="bPassZ" step="0.1" title="centre height (z)" style="width:52px">
       </div>
-      <div id="bRefRow" style="display:none;border-top:1px solid #222836;margin-top:6px;padding-top:6px">
+      <div id="bRefRow" style="display:none;border-top:1px solid var(--line-3);margin-top:6px;padding-top:6px">
         <div class="fRow"><label style="color:#4a83ff" title="the blue ring shown in the preview">checkpoint ref</label>
-          <span style="color:#8a93a6;font-size:11px">ring position + crossing (fly-through) direction</span></div>
+          <span style="color:var(--dim);font-size:11px">ring position + crossing (fly-through) direction</span></div>
         <div class="fRow"><label title="ring position — x, y, z (up)">ring pos</label>
           <input type="number" id="bRefX" step="0.1" title="ref x" style="width:52px">
           <input type="number" id="bRefY" step="0.1" title="ref y" style="width:52px">
@@ -930,7 +999,7 @@
           <button id="bAddPyramid">＋ pyramid</button>
           <button id="bAddWedge">＋ wedge</button>
           <button id="bAddCone">＋ cone</button>
-          <button id="bAddObj" title="BETA — import a .obj mesh as a part (exported as an inline MRSIM polyhedron)">＋ import .obj… <span style="color:#e0c040">beta</span></button>
+          <button id="bAddObj" title="BETA — import a .obj mesh as a part (exported as an inline MRSIM polyhedron)">＋ import .obj… <span style="color:var(--glow)">beta</span></button>
           <input type="file" id="bObjFile" class="bImport" accept=".obj">
         </div>
       </div>
@@ -1299,6 +1368,7 @@ function applyEnv() {
   document.getElementById('btnLook').classList.toggle('on', game);
   // the colour pickers set the editor look; the game look has fixed colours
   for (const id of ['skyColor', 'groundColor', 'gridColor']) document.getElementById(id).disabled = game;
+  applyUiTheme();
   const el = id => document.getElementById(id);
   el('gridSize').value = String(env.cell);
   el('gridColor').value = env.grid;
@@ -1317,6 +1387,25 @@ function applyFog() {
   camera.far = Math.max(camera.far, env.fog === 'normal' ? 0 : 4000);
   camera.updateProjectionMatrix();
 }
+// dark or light panels: a per-browser choice, kept apart from the scene look
+// (reset to defaults does not touch it)
+const UI_THEMES = ['dark', 'light', 'auto'];
+let uiTheme = 'dark';
+try { const t = localStorage.getItem('mrsim.uiTheme'); if (UI_THEMES.includes(t)) uiTheme = t; } catch {}
+function applyUiTheme() {
+  const light = uiTheme === 'light' || (uiTheme === 'auto' && env.look === 'game');
+  if (light) document.documentElement.dataset.ui = 'light';
+  else delete document.documentElement.dataset.ui;
+  document.getElementById('uiTheme').value = uiTheme;
+}
+function setUiTheme(t) {
+  if (!UI_THEMES.includes(t)) return;
+  uiTheme = t;
+  try { localStorage.setItem('mrsim.uiTheme', t); } catch {}
+  applyUiTheme();
+}
+document.getElementById('uiTheme').onchange = e => setUiTheme(e.target.value);
+window.__uiTheme = setUiTheme;
 function setEnv(patch) {
   Object.assign(env, patch);
   try { localStorage.setItem(ENV_KEY, JSON.stringify(env)); } catch {}
@@ -5283,7 +5372,7 @@ function renderParts() {
   const host = document.getElementById('bParts');
   const parts = builderState.def.parts;
   if (!parts.length) {
-    host.innerHTML = '<div style="color:#8a93a6;padding:4px 0;font-size:11.5px">no parts yet — add a box, cylinder, sphere, pyramid, wedge or cone</div>';
+    host.innerHTML = '<div style="color:var(--dim);padding:4px 0;font-size:11.5px">no parts yet — add a box, cylinder, sphere, pyramid, wedge or cone</div>';
     return;
   }
   const fv = v => (v === undefined || v === null ? 0 : v);
@@ -5572,7 +5661,7 @@ function elementToComponent(name) { return selectionToComponent([name], name); }
 // transient status in the edit panel's hint line (overwritten on next select)
 function edFlash(msg, err = false) {
   const h = document.getElementById('edHint'); if (!h) return;
-  h.innerHTML = `<span style="color:${err ? '#ff8a7a' : '#7ab648'}">${escapeHtml(msg)}</span>`;
+  h.innerHTML = `<span style="color:var(${err ? '--danger-text' : '--edit-text'})">${escapeHtml(msg)}</span>`;
 }
 function copySelectionToBuilder() {
   const names = editUi.selection.filter(n => elemIndexByName(n) >= 0);
