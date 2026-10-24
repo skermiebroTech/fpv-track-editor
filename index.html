@@ -633,7 +633,7 @@
   <span class="grp file" role="group" aria-label="track">
     <select id="track" title="open a bundled track" aria-label="bundled track"></select>
     <label class="file" title="open a MRSIM .xml track from your computer">import<input id="file" type="file" accept=".xml,.trk,.json"></label>
-    <button id="btnNew" title="start a blank track, or generate a lens calibration track">new</button>
+    <button id="btnNew" aria-expanded="false" title="start a blank track, or generate a lens calibration track">new</button>
   </span>
   <span class="grp" role="group" aria-label="view">
     <button id="btnTop" title="snap the camera directly overhead">top</button>
@@ -643,9 +643,9 @@
   </span>
   <span class="grp" role="group" aria-label="scene">
     <select id="locSel" title="track location — the MRSIM environment the track loads in (exported with the track)" aria-label="track location"></select>
-    <button id="btnEnv" title="environment — grid, sky, fog and ground">environment</button>
+    <button id="btnEnv" aria-expanded="false" title="environment — grid, sky, fog and ground">environment</button>
     <button id="btnLook" title="game look — the daytime sky, sun and grass of MRSIM (click again for the editor look)">game look</button>
-    <button id="btnTpl" title="template images — reference photos / top-down maps (editor only, not exported)">templates</button>
+    <button id="btnTpl" aria-expanded="false" title="template images — reference photos / top-down maps (editor only, not exported)">templates</button>
   </span>
   <span class="grp" role="group" aria-label="edit">
     <button id="btnEdit" title="edit mode: select, move and place objects, and set the lap">✎ edit</button>
@@ -968,7 +968,7 @@
           <dt><kbd>?</kbd></dt><dd>this help</dd>
           <dt><kbd>Ctrl</kbd> <kbd>Z</kbd></dt><dd>undo</dd>
           <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Z</kbd></dt><dd>redo (also <kbd>Ctrl</kbd> <kbd>Y</kbd>)</dd>
-          <dt><kbd>Esc</kbd></dt><dd>close this help</dd>
+          <dt><kbd>Esc</kbd></dt><dd>close this help or an open popover</dd>
         </dl>
         <h3>camera</h3>
         <p id="helpCam"></p>
@@ -1335,11 +1335,7 @@ function resetEnv() {
   document.getElementById('fogLevel').onchange = e => setEnv({ fog: e.target.value });
   document.getElementById('btnLook').onclick = () => setEnv({ look: env.look === 'game' ? 'editor' : 'game' });
   document.getElementById('envReset').onclick = resetEnv;
-  const envBtn = document.getElementById('btnEnv'), envPanel = document.getElementById('envPanel');
-  envBtn.onclick = () => {
-    const open = envPanel.classList.toggle('hidden');
-    envBtn.classList.toggle('on', !open);
-  };
+  document.getElementById('btnEnv').onclick = () => setPopover('envPanel');
   applyEnv();
 }
 window.__env = { get: () => ({ ...env, gridY }), set: setEnv, reset: resetEnv,
@@ -5927,7 +5923,12 @@ addEventListener('keydown', e => {
     if (e.key === 'Escape' || e.key === '?') { e.preventDefault(); setHelp(false); }
     return;
   }
+  // Esc inside a popover's field closes the popover (the palette search box
+  // handles its own Esc first, above)
+  if (e.key === 'Escape' && document.activeElement?.closest('#newPanel, #envPanel, #tplPanel')) {
+    document.activeElement.blur(); closePopovers(); return; }
   if (typingInField()) return;
+  if (e.key === 'Escape' && closePopovers()) return;
   if (e.key === '?' && !e.ctrlKey && !e.metaKey && !e.altKey) {
     e.preventDefault(); setHelp(true); return; }
   if (e.key.toLowerCase() === 'z' && (e.ctrlKey || e.metaKey)) {
@@ -6234,12 +6235,8 @@ function lcSyncFrame() {
 lcFrame.onchange = lcLens.onchange = lcAngle.oninput = lcSyncFrame;
 document.getElementById('lcDistance').addEventListener('input', lcSyncFrame);
 lcCam.addEventListener('input', () => { if (lcFrame.value) lcSyncFrame(); });
-function setNewPanel(open) {
-  if (open) newPanel.style.left = Math.round(newBtn.getBoundingClientRect().left) + 'px';
-  newPanel.classList.toggle('hidden', !open);
-  newBtn.classList.toggle('on', open);
-}
-newBtn.onclick = () => setNewPanel(newPanel.classList.contains('hidden'));
+function setNewPanel(open) { setPopover('newPanel', open); }
+newBtn.onclick = () => setPopover('newPanel');
 document.getElementById('newBlank').onclick = () => { setNewPanel(false); newBlankTrack(); };
 async function newLensCalTrack(opts) {
   const xml = lensCalibrationXml(opts);   // throws on an impossible size
@@ -6260,6 +6257,38 @@ document.getElementById('lcCreate').onclick = async () => {
     if (await newLensCalTrack(opts)) setNewPanel(false);
   } catch (err) { errEl2.textContent = err.message; }
 };
+
+// ---- toolbar popovers (new track, environment, templates) ----
+// Each hangs under its own toolbar button, so it no longer covers the edit
+// panel at the left edge. One is open at a time, and Esc closes it.
+const POPOVERS = { newPanel: 'btnNew', envPanel: 'btnEnv', tplPanel: 'btnTpl' };
+function placePopover(panel) {
+  const btn = document.getElementById(POPOVERS[panel.id]);
+  const max = innerWidth - panel.offsetWidth - 10;
+  // keep clear of the open edit panel when the window has room for both
+  const ed = document.getElementById('editPanel');
+  const min = ed.classList.contains('show') ? Math.min(ed.getBoundingClientRect().right + 8, max) : 10;
+  panel.style.left = Math.round(Math.max(10, min, Math.min(btn.getBoundingClientRect().left, max))) + 'px';
+}
+// open (true), close (false) or toggle (undefined) one popover
+function setPopover(id, open) {
+  const panel = document.getElementById(id);
+  if (open === undefined) open = panel.classList.contains('hidden');
+  for (const [pid, bid] of Object.entries(POPOVERS)) {
+    const on = open && pid === id;
+    document.getElementById(pid).classList.toggle('hidden', !on);
+    document.getElementById(bid).classList.toggle('on', on);
+    document.getElementById(bid).setAttribute('aria-expanded', on);
+  }
+  if (open) placePopover(panel);
+}
+// close whichever popover is open; true when there was one
+function closePopovers() {
+  const open = Object.keys(POPOVERS).filter(id => !document.getElementById(id).classList.contains('hidden'));
+  open.forEach(id => setPopover(id, false));
+  return open.length > 0;
+}
+window.__popover = setPopover;
 
 document.getElementById('btnTop').onclick = e => {
   const on = e.target.classList.toggle('on');
@@ -6287,8 +6316,15 @@ document.getElementById('btnCp').onclick = e => {
 // height so the panels below it never slide under it
 {
   const bar = document.getElementById('bar');
-  const syncBarH = () => document.documentElement.style.setProperty('--bar-h',
-    Math.ceil(bar.getBoundingClientRect().height) + 'px');
+  const syncBarH = () => {
+    document.documentElement.style.setProperty('--bar-h',
+      Math.ceil(bar.getBoundingClientRect().height) + 'px');
+    // a wrap moves the buttons: keep an open popover under its button
+    for (const id of Object.keys(POPOVERS)) {
+      const p = document.getElementById(id);
+      if (!p.classList.contains('hidden')) placePopover(p);
+    }
+  };
   new ResizeObserver(syncBarH).observe(bar);
   syncBarH();
 }
@@ -6661,14 +6697,7 @@ document.getElementById('tplFile').onchange = async e => {
   }
   e.target.value = '';
 };
-{
-  const tplBtn = document.getElementById('btnTpl');
-  const tplPanel = document.getElementById('tplPanel');
-  tplBtn.onclick = () => {
-    const open = tplPanel.classList.toggle('hidden');
-    tplBtn.classList.toggle('on', !open);
-  };
-}
+document.getElementById('btnTpl').onclick = () => setPopover('tplPanel');
 document.getElementById('tplCalStage').addEventListener('click', onCalStageClick);
 document.getElementById('tplCalCancel').onclick = closeCalibration;
 document.getElementById('tplCalReset').onclick = () => {
