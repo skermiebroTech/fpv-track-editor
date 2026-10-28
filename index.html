@@ -3018,8 +3018,8 @@ const PALETTE = [
   ...CHAMPS_COLOURS.map(([c, lbl]) => ({ id: 'c25p' + c, label: `Champs25 pole ${lbl}`,
     libMacro: 'Champs25Pole' + c, libFile: 'Gates/Champs25Pole.xml', cp: null })),
   // the game's own flag + one-sided pass (FlagPassRight/Left.xml)
-  { id: 'fpassR',  label: 'flag pass R (game)', include: 'FlagPassRight.xml', cp: 'wrapper' },
-  { id: 'fpassL',  label: 'flag pass L (game)', include: 'FlagPassLeft.xml', cp: 'wrapper' },
+  { id: 'fpassR',  label: 'flag pass R', include: 'FlagPassRight.xml', cp: 'wrapper' },
+  { id: 'fpassL',  label: 'flag pass L', include: 'FlagPassLeft.xml', cp: 'wrapper' },
   // a tower is a gate on a frame: its gate is a race checkpoint (the official
   // tracks list every tower), centred like the gates
   { id: 'tower5',  label: '5×5 tower',         macro: 'Centered5x5Tower', cp: 'wrapper' },
@@ -4349,8 +4349,14 @@ const palMatches = def => {
   return palFilter.split(/\s+/).every(t => hay.includes(t));
 };
 
-// palette buttons — built-ins, then a "custom" section of user/repo components,
-// then the "build object" entry point. Re-rendered whenever components change.
+// a palette entry the game itself provides: it references a library file or
+// macro, so the game loads its own model. Everything else is built by the
+// editor from primitives (custom gates, combos, sensors, demo objects).
+const isGameObject = def => !!(def.macro || def.include || def.libMacro);
+
+// palette buttons — the MRSIM objects, the editor's own objects, LED / neon,
+// then "custom" and "community" sections and the "build object" entry point.
+// Re-rendered whenever components change.
 function renderPalette() {
   const pal = document.getElementById('palette');
   if (!pal) return;
@@ -4368,19 +4374,39 @@ function renderPalette() {
     b.addEventListener('mouseleave', () => { clearTimeout(previewHover); hidePreview(); });
     return b;
   };
+  const divider = text => {
+    const div = document.createElement('div');
+    div.className = 'palDivide'; div.textContent = text;
+    pal.appendChild(div);
+  };
   const builtin = PALETTE.filter(def => !HIDDEN_NO_MODEL.has(def.id) && palMatches(def));
-  builtin.forEach(def => pal.appendChild(mkBtn(def)));
   const allCustom = customDefs();
   // shadowing is by the FULL custom set, not the filtered one — a search must
   // never resurrect a built-in that a custom component has replaced
   const shadowed = new Set(allCustom.map(c => c.id));
   const demo = DEMO_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
-  demo.forEach(def => pal.appendChild(mkBtn(def)));
+  // the game's own objects first, then the ones the editor builds itself
+  const game = builtin.filter(isGameObject);
+  const editorMade = [...builtin.filter(d => !isGameObject(d)), ...demo];
+  if (game.length) {
+    divider('MRSIM objects');
+    game.forEach(def => {
+      const b = mkBtn(def);
+      b.title += ' · built into MRSIM: the game loads its own model';
+      pal.appendChild(b);
+    });
+  }
+  if (editorMade.length) {
+    divider('editor objects');
+    editorMade.forEach(def => {
+      const b = mkBtn(def);
+      b.title += ' · made by the editor from shapes, not a game object';
+      pal.appendChild(b);
+    });
+  }
   const neon = NEON_OBJECTS.filter(d => !shadowed.has(d.id) && palMatches(d));
   if (neon.length) {
-    const div = document.createElement('div');
-    div.className = 'palDivide'; div.textContent = 'LED / neon';
-    pal.appendChild(div);
+    divider('LED / neon');
     neon.forEach(def => {
       const b = mkBtn(def);
       b.title = (def.cp ? 'joins the lap when placed' : 'scenery only') +
