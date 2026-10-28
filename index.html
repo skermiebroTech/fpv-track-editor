@@ -938,6 +938,7 @@ import { creditComment, CREDIT_RE, CREDIT_PILOT_RE, LEGACY_CREDIT_RE }
   from './lib/credit.js';
 // LED / neon shapes + the emissive material, shared with the VelociDrone
 // importer so a placed neon ring and a imported one are the same object
+import { lookalike } from './lib/lookalike.js';
 import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './lib/neon.js';
 import { lensCalibrationXml, lensCalPlatform, lensOffset, LENS_CAL_DEFAULTS, MRSIM_FRAMES,
   MRSIM_LENSES, STAND_TOP } from './lib/lens-cal.js';
@@ -1380,11 +1381,18 @@ async function preloadModels(names) {
   }));
 }
 
+// A game mesh with no collision shapes to draw instead (the championship
+// launch stand) gets a hand-built stand-in from lib/lookalike.js: the stand's
+// measured size and paint, no game assets. Other meshes keep drawing from
+// their collision shapes.
+const STANDINS = new Set(['ChampionshipLaunchStand']);
+const hasMesh = name => templates.has(name) || STANDINS.has(name);
+
 // clone a model template and paint each named part with its real MRSIM material.
 // isStart recolours the gate top banner red; elemIndex varies the atlas artwork.
 function modelInstance(name, elemIndex = 0, isStart = false) {
   const tpl = templates.get(name);
-  if (!tpl) return null;
+  if (!tpl) return STANDINS.has(name) ? lookalike(name, THREE, { variant: elemIndex, isStart }) : null;
   const inst = tpl.clone(true);
   const map = PART_MAT[name];
   inst.traverse(o => {
@@ -1587,7 +1595,7 @@ async function build(data, keepCamera = false) {
     // collision shadow — drawing both doubles up. Sibling prims from OTHER
     // sources (e.g. the importer's riser pole under a lifted flag) still draw.
     const meshSrcs = new Set((el.models || [])
-      .filter(m => templates.has(m.model)).map(m => m.src));
+      .filter(m => hasMesh(m.model)).map(m => m.src));
 
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;
@@ -3100,7 +3108,7 @@ const PALETTE = [
   { id: 'flag180', label: 'flag 180 (deco)',   include: 'Flag180.xml', cp: null },
   { id: 'mat',     label: '7×7 launch mat',    include: '7x7Mat.xml', cp: null },
   { id: 'stand',   label: 'launch stand',      include: 'LaunchStands/MetalLaunchStand.xml', cp: null },
-  { id: 'standC',  label: 'champ stand',       include: 'LaunchStands/ChampionshipLaunchStand.xml', cp: null },
+  { id: 'standC',  label: 'MultiGP champs launch stand', include: 'LaunchStands/ChampionshipLaunchStand.xml', cp: null },
   { id: 'canopy',  label: 'shade canopy',      include: 'Furniture/ShadeCanopy.xml', cp: null },
 ];
 const MACRO_SHIFTS = {
@@ -4405,7 +4413,7 @@ document.getElementById('edColAll').onclick = () => applyColor('all');
 // don't show up as an empty "no mesh" preview. Champs25 gate/pole, the DiveGate
 // deco frame, and the championship launch stand live only in the local overlay.
 // Restore them by emptying this set once the models ship in models.json.
-const HIDDEN_NO_MODEL = new Set(['divecl', 'standC']);
+const HIDDEN_NO_MODEL = new Set(['divecl']);
 
 // the search term is module state rather than being read off the input, so the
 // palette can be re-rendered from anywhere (a component was saved, the shared
@@ -4612,7 +4620,7 @@ function buildPreviewGroup(data, doc) {
   const g = new THREE.Group();
   const V = new THREE.Vector3(), matCache = new Map();
   data.elements.forEach((el, ei) => {
-    const meshSrcs = new Set((el.models || []).filter(m => templates.has(m.model)).map(m => m.src));
+    const meshSrcs = new Set((el.models || []).filter(m => hasMesh(m.model)).map(m => m.src));
     el.prims.forEach(p => {
       if (meshSrcs.has(p.src)) return;         // collision shadow of a rendered mesh
       const mat = previewDocMat(doc, p.material, matCache) || matFor(p.hint);

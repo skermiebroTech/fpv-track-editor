@@ -11,6 +11,9 @@
 # lens-cal.js builds the lens calibration track from the "new" popover;
 # imported on every page load too.
 !/lib/lens-cal.js
+# lookalike.js builds the hand-made stand-in for the championship launch
+# stand, which has no collision shapes to draw; imported on every page load.
+!/lib/lookalike.js
 
 # MRSIM object meshes/textures decoded from MRSIM.dkb are the game
 # developer's copyrighted assets. Never redistributed. The published
