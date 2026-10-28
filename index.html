@@ -1450,6 +1450,32 @@ function primScale(p) {
   if (p.shape === 'sphere') { const r = p.dims[0] || 0.1; return [r, r, r]; }
   return p.dims.map(d => Math.max(d, 0.02));   // box / pyramid / wedge / poly bbox
 }
+// a prim's world bounds: its unit geometry, scaled and placed like the drawn
+// mesh. (A cube of the longest side around the centre puts a flat 2 m pole,
+// like a pole ladder's base, 1 m under the ground and drags the grid down.)
+const _pbM = new THREE.Matrix4(), _pbV = new THREE.Vector3();
+function primBox(p) {
+  if (p.shape === 'poly' && p.verts) {
+    const b = new THREE.Box3();
+    for (let i = 0; i + 2 < p.verts.length; i += 3)
+      b.expandByPoint(_pbV.set(p.verts[i], p.verts[i + 1], p.verts[i + 2]).applyMatrix4(p.matrix));
+    return b;
+  }
+  const geo = GEO_FOR[p.shape] || unitBox;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const s = primScale(p);
+  return geo.boundingBox.clone().applyMatrix4(_pbM.copy(p.matrix).scale(_pbV.set(s[0], s[1], s[2])));
+}
+
+// a thin vertical cylinder about 1 m long: the metal spike a flag or a
+// Champs25 pole stands on, centred on the ground. Gate posts and pole-gate
+// pipes are thin too, but 1.8 m or longer.
+function isGroundSpike(p) {
+  if (p.shape !== 'cyl' || p.dims[0] > 0.025 || p.dims[1] > 1.05) return false;
+  const e = p.matrix.elements;                 // local z axis = the cylinder axis
+  return Math.abs(e[9]) > 0.95 * Math.hypot(e[8], e[9], e[10]);
+}
+
 const sensorMat = new THREE.MeshBasicMaterial({
   color: '#e0c040', transparent: true, opacity: 0.08,
   depthWrite: false, side: THREE.DoubleSide });
@@ -1508,16 +1534,19 @@ async function build(data, keepCamera = false) {
 
   data.elements.forEach((el, ei) => {
     const bbox = new THREE.Box3();
+    // the ground is where objects stand: a flag's or a Champs25 pole's 1 m
+    // ground spike is half buried in the game too, so it counts at its centre
+    const standBox = new THREE.Box3();
     el.prims.forEach(p => {
-      const c = new THREE.Vector3().setFromMatrixPosition(p.matrix);
-      const half = Math.max(...p.dims) / 2;
-      bbox.expandByPoint(c.clone().addScalar(half));
-      bbox.expandByPoint(c.clone().addScalar(-half));
+      const b = primBox(p);
+      bbox.union(b);
+      if (isGroundSpike(p)) standBox.expandByPoint(b.getCenter(_pbV));
+      else standBox.union(b);
     });
     el.models.forEach(m => bbox.expandByPoint(new THREE.Vector3().setFromMatrixPosition(m.matrix)));
     if (el.kind !== 'deco') { if (!bbox.isEmpty()) courseBox.union(bbox); }
-    if (/gate|dive|flag|cube/.test(el.kind) && el.prims.length)
-      groundY = Math.min(groundY, bbox.min.y);
+    if (/gate|dive|flag|cube/.test(el.kind) && !standBox.isEmpty())
+      groundY = Math.min(groundY, standBox.min.y);
     if (el.kind === 'gate' && !bbox.isEmpty())
       gateWidths.push({ name: el.name, w: +(bbox.max.x - bbox.min.x).toFixed(2) || +(bbox.max.z - bbox.min.z).toFixed(2) });
 
