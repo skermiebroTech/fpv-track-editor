@@ -108,6 +108,11 @@ function matHint(shape, dims, material, tags) {
     if (glow) return `glow:${glow[1].toLowerCase()}`;
   }
   const src = tags.join(' ');
+  // Champs25 LED gate/pole: the colour macro wraps the LightsOff one, so a
+  // coloured name in the tags wins
+  const led = src.match(/Champs25(?:Gate|Pole)(Red|Green|Blue|Yellow|White)/);
+  if (led) return 'led:' + led[1].toLowerCase();
+  if (/Champs25/.test(src)) return 'dark';
   if (shape === 'box') {
     if (/7x7Mat/.test(src)) return 'padMat';                 // 3x3 launch mat
     if (/ShadeCanopy|LaunchStand|StartBlock/.test(src)) return 'dark';
@@ -486,6 +491,13 @@ function assemble(st, fileName) {
     isStart: [...e.tags].some(t => /StartFinish/.test(t))
       || e.prims.some(p => /Start(Finish|Banner)/.test(p.material || '')),
     tags: [...e.tags],
+    // the CheckpointList name of every checkpoint inside the element, dotted
+    // from the element down ("cube8.topEntry"); one entry for a plain gate
+    cpNames: e.cps.map(i => {
+      const p = st.checkpoints[i].path;
+      const at = p.indexOf(e.name);
+      return (at >= 0 ? p.slice(at) : p).join('.');
+    }),
     prims: e.prims.map(p => ({
       shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
       solid: p.solid !== false,

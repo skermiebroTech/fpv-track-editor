@@ -300,6 +300,9 @@
     border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 5px 0; font: inherit;
     font-size: 11.5px; cursor: pointer; }
   #editPanel .btnRow button:hover { background: var(--surface-3); border-color: var(--accent); }
+  #editPanel .btnRow select { flex: 1.4; min-width: 0; background: var(--surface-2);
+    color: var(--text); border: 1px solid var(--line-2); border-radius: var(--r-sm);
+    font: inherit; font-size: 11.5px; }
   #editPanel .btnRow button.danger:hover { background: #2e1a1a;
     border-color: var(--danger); color: var(--danger-text); }
   #editPanel .btnRow button.on { background: #4a1e1e; border-color: var(--danger); color: #ff9a8a; }
@@ -736,6 +739,8 @@
       <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
   </div>
   <div class="btnRow">
+    <select id="edLapSub" style="display:none"
+      title="this object holds more than one checkpoint — pick the one “+ lap” adds"></select>
     <button id="edLapAdd">+ lap</button>
     <button id="edDup">duplicate</button>
     <button id="edDel" class="danger">✕ delete</button>
@@ -915,7 +920,7 @@
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=12",
+    "./mrsim.js": "./mrsim.js?v=13",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
@@ -1387,10 +1392,14 @@ const MATS = {
 const BLOCK_HEX = { Black:'#0d0d0d', White:'#e6e6e6', Red:'#e60000', Orange:'#e67300',
   Yellow:'#e6e600', Green:'#00cc00', Cyan:'#00d9d9', Blue:'#0000e6', Purple:'#8c00e6',
   Pink:'#f280bf', RedPink:'#e61a66', LightBlue:'#0566e6', DarkGreen:'#006619' };
+// Champs25 LED colours (the game's emissive slot is pure R/G/B/RG/RGB)
+const LED_HEX = { red: '#ff2a2a', green: '#2aff4a', blue: '#2a5cff', yellow: '#ffe22a', white: '#ffffff' };
 function matFor(hint) {
   if (MATS[hint]) return MATS[hint];
   const b = hint.match(/^blk:(\w+)$/);
   if (b) return (MATS[hint] = mkMat(BLOCK_HEX[b[1]] || '#9a9a9a', 0.15));
+  const led = hint.match(/^led:(\w+)$/);       // Champs25 LED colours
+  if (led) return (MATS[hint] = mkMat(LED_HEX[led[1]] || '#ffffff', 0.9));
   return MATS.dark;
 }
 
@@ -2960,6 +2969,9 @@ function refreshStartRow() {
 // carries it (list "<name>_pass"); null = scenery, no lap entry.
 // ---------------------------------------------------------------------------
 const LIB = '/Data/Simulations/Multirotor/';
+// the six Champs25 macro colours: [macro suffix, palette label]
+const CHAMPS_COLOURS = [['Red', 'red'], ['Green', 'green'], ['Blue', 'blue'],
+  ['Yellow', 'yellow'], ['White', 'white'], ['LightsOff', 'lights off']];
 const PALETTE = [
   { id: 'gate5',   label: '5×5 gate (2.1 m)',  macro: 'Centered5x5Gate', cp: 'wrapper' },
   { id: 'gate7',   label: '7×6 gate (3 m)',    macro: 'Centered7x6Gate', cp: 'wrapper' },
@@ -2967,7 +2979,6 @@ const PALETTE = [
   { id: 'sf7',     label: '7×6 start/finish',  macro: 'Centered7x6StartFinishGate', cp: 'wrapper' },
   { id: 'gatefab', label: 'gate 2 m (fabric)', gateKind: 'fabric', cp: 'pass' },
   { id: 'gatesq',  label: 'gate 2.5 m square', gateKind: 'square', cp: 'pass' },
-  { id: 'champs',  label: 'Champs25 LED gate', include: 'Gates/Champs25Gate.xml', cp: 'wrapper' },
   { id: 'dive',    label: '7×7 dive gate',     include: '7x7DiveGate.xml', cp: 'wrapper' },
   { id: 'climb',   label: '7×7 climb gate',    include: '7x7ClimbGate.xml', cp: 'wrapper' },
   { id: 'divebox', label: '7×7 dive box',      include: '7x7DiveBox.xml', cp: 'wrapper' },
@@ -2979,15 +2990,46 @@ const PALETTE = [
   { id: 'flagR',   label: 'flag + pass R',     flagCombo: 'HalfPlanePassageRight.xml', cp: 'pass' },
   { id: 'flagL',   label: 'flag + pass L',     flagCombo: 'HalfPlanePassageLeft.xml', cp: 'pass' },
   { id: 'check',   label: 'checkpoint (box)',  sensor: true, cp: 'pass' },
-  { id: 'tower5',  label: '5×5 tower',         include: '5x5Tower.xml', cp: null },
-  { id: 'tower7',  label: '7×6 tower',         include: '7x6Tower.xml', cp: null },
+  // pole gates (Gates/PoleGates.xml macros). Each one holds several
+  // checkpoints, listed as dotted names ("edPcube1.frontEntry"); `cpSubs` is
+  // the default lap entry, a straight pass along +Y. Pick others with the
+  // checkpoint selector beside "+ lap".
+  { id: 'pcube',   label: 'pole cube 2 m',     libMacro: 'PipeCube', cp: 'sub',
+    cpSubs: ['frontEntry', 'backExit'] },
+  { id: 'pdcube',  label: 'pole double cube',  libMacro: 'PipeDoubleCube', cp: 'sub',
+    cpSubs: ['lower.frontEntry', 'lower.backExit'] },
+  { id: 'pladder', label: 'pole ladder (2)',   libMacro: 'PipeLadder', cp: 'sub',
+    cpSubs: ['lower.front'] },
+  { id: 'pquad',   label: 'pole ladder (4)',   libMacro: 'PipeQuadrupleLadder', cp: 'sub',
+    cpSubs: ['level1.front'] },
+  // the cube parts on their own, for home-made pole structures. A pole and a
+  // passage are centred on their origin, so lift them to stand on the ground.
+  { id: 'pcubetop', label: 'pole cube top',    libMacro: 'PaddedPoleCubeTop', cp: 'sub',
+    cpSubs: ['frontEntry', 'backExit'] },
+  { id: 'psquare', label: 'pole square (floor)', libMacro: 'PaddedPoleSquare', lift: '.04', cp: null },
+  { id: 'ppole',   label: 'padded pole',       libMacro: 'PaddedPole', lift: '1.04', cp: null },
+  { id: 'ppoleNT', label: 'padded pole (no tape)', libMacro: 'PaddedPoleNoTape', lift: '1.04', cp: null },
+  { id: 'ppass',   label: 'pole passage 2×2',  libMacro: 'PoleSquarePassage', lift: '1.04', cp: 'wrapper' },
+  { id: 'ppassQ',  label: 'pole passage 2×1.5', libMacro: 'PoleQuadrupleLadderPassage', lift: '.79', cp: 'wrapper' },
+  // Champs25 LED gates and poles (Gates/Champs25*.xml macros), one entry per
+  // game colour. The gate is already X-centred, its checkpoint at z 1.27.
+  ...CHAMPS_COLOURS.map(([c, lbl]) => ({ id: 'c25g' + c, label: `Champs25 gate ${lbl}`,
+    libMacro: 'Champs25Gate' + c, libFile: 'Gates/Champs25Gate.xml', cp: 'wrapper' })),
+  ...CHAMPS_COLOURS.map(([c, lbl]) => ({ id: 'c25p' + c, label: `Champs25 pole ${lbl}`,
+    libMacro: 'Champs25Pole' + c, libFile: 'Gates/Champs25Pole.xml', cp: null })),
+  // the game's own flag + one-sided pass (FlagPassRight/Left.xml)
+  { id: 'fpassR',  label: 'flag pass R (game)', include: 'FlagPassRight.xml', cp: 'wrapper' },
+  { id: 'fpassL',  label: 'flag pass L (game)', include: 'FlagPassLeft.xml', cp: 'wrapper' },
+  // a tower is a gate on a frame: its gate is a race checkpoint (the official
+  // tracks list every tower), centred like the gates
+  { id: 'tower5',  label: '5×5 tower',         macro: 'Centered5x5Tower', cp: 'wrapper' },
+  { id: 'tower7',  label: '7×6 tower',         macro: 'Centered7x6Tower', cp: 'wrapper' },
   { id: 'hurdle4', label: 'hurdle 4×7',        include: '4x7Hurdle.xml', cp: null },
-  { id: 'carous',  label: 'carousel down',     include: 'CarouselDown.xml', cp: null },
+  // a 5x5 gate with a flag beside it: the gate is the checkpoint
+  { id: 'carous',  label: 'carousel down',     include: 'CarouselDown.xml', cp: 'wrapper' },
   { id: 'divecl',  label: 'dive frame (deco)', include: 'DiveGate.xml', cp: null },
-  { id: 'poleC25', label: 'Champs25 pole',     include: 'Gates/Champs25Pole.xml', cp: null },
   { id: 'flag',    label: 'flag (deco)',       include: 'Flag.xml', cp: null },
   { id: 'flag180', label: 'flag 180 (deco)',   include: 'Flag180.xml', cp: null },
-  { id: 'block',   label: 'start block',       include: 'StartBlock.xml', cp: null },
   { id: 'mat',     label: '7×7 launch mat',    include: '7x7Mat.xml', cp: null },
   { id: 'stand',   label: 'launch stand',      include: 'LaunchStands/MetalLaunchStand.xml', cp: null },
   { id: 'standC',  label: 'champ stand',       include: 'LaunchStands/ChampionshipLaunchStand.xml', cp: null },
@@ -2998,6 +3040,8 @@ const MACRO_SHIFTS = {
   Centered5x5StartFinishGate: ['-1.05', '5x5StartFinishGate.xml'],
   Centered7x6Gate: ['-1.5', '7x6Gate.xml'],
   Centered7x6StartFinishGate: ['-1.5', '7x6StartFinishGate.xml'],
+  Centered5x5Tower: ['-1.05', '5x5Tower.xml'],
+  Centered7x6Tower: ['-1.5', '7x6Tower.xml'],
 };
 
 // ---------------------------------------------------------------------------
@@ -3226,6 +3270,26 @@ function ensureRootInclude(file, ops) {
   inc.setAttribute('file', LIB + file);
   root.insertBefore(inc, root.firstChild);
   ops.push({ type: 'insert', node: inc });
+}
+
+// a library file that only defines macros (pole gates, Champs25) is included
+// once at the root, after the instance groups it draws with: the official
+// tracks put it after the last root-level include
+function ensureLibInclude(file, ops) {
+  const root = rootSim();
+  const includes = [...root.children].filter(c => c.tagName === 'Include');
+  if (includes.some(c => (c.getAttribute('file') || '').endsWith(file))) return;
+  const inc = editState.doc.createElement('Include');
+  inc.setAttribute('file', LIB + file);
+  root.insertBefore(inc, includes.length ? includes[includes.length - 1].nextSibling : root.firstChild);
+  ops.push({ type: 'insert', node: inc });
+}
+
+// the lap entries a fresh placement adds
+function lapEntriesFor(def, name) {
+  if (def.cp === 'sub') return def.cpSubs.map(s => name + '.' + s);
+  if (def.cp === 'pass') return [name + '_pass'];
+  return def.cp ? [name] : [];
 }
 
 // ---- custom gates (the importer's true-size frames) ----------------------
@@ -3518,6 +3582,17 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     const inst = doc.createElement('Instance');
     inst.setAttribute('macro', def.macro);
     ent.appendChild(inst);
+  } else if (def.libMacro) {
+    ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    ensureLibInclude(def.libFile || 'Gates/PoleGates.xml', ops);
+    const inst = doc.createElement('Instance');
+    inst.setAttribute('macro', def.libMacro);
+    if (def.lift) {
+      const lift = doc.createElement('Transform');
+      lift.setAttribute('z', def.lift);
+      lift.appendChild(inst);
+      ent.appendChild(lift);
+    } else ent.appendChild(inst);
   } else if (def.include) {
     ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
     const inc = doc.createElement('Include');
@@ -3525,15 +3600,25 @@ function buildPlacement(def, name, mx, my, mz, ops) {
     ent.appendChild(inc);
   } else if (def.flagCombo) {
     ensureRootInclude('DroneTrackInstanceGroups.xml', ops);
+    // the game's own layout (FlagPassRight/Left.xml): the left version turns
+    // the flag 180 degrees, and the pass sits 3 m up
     const flag = doc.createElement('Include');
     flag.setAttribute('file', LIB + 'Flag.xml');
-    ent.appendChild(flag);
+    if (/Left/.test(def.flagCombo)) {
+      const turn = doc.createElement('Transform');
+      turn.setAttribute('rz', '-1'); turn.setAttribute('angleDegrees', '180');
+      turn.appendChild(flag);
+      ent.appendChild(turn);
+    } else ent.appendChild(flag);
+    const lift = doc.createElement('Transform');
+    lift.setAttribute('z', '3');
     const pass = doc.createElement('Entity');
     pass.setAttribute('name', name + '_pass');
     const inc = doc.createElement('Include');
     inc.setAttribute('file', LIB + def.flagCombo);
     pass.appendChild(inc);
-    ent.appendChild(pass);
+    lift.appendChild(pass);
+    ent.appendChild(lift);
   } else if (def.sensor) {
     // bare trigger volume, the importer's pattern: 3 m wide, 2.5 m tall
     const pass = doc.createElement('Entity');
@@ -3681,10 +3766,7 @@ function placeAt(def, p3) {
   const ops = [];
   const name = uniqueName('ed' + def.id[0].toUpperCase() + def.id.slice(1));
   buildPlacement(def, name, mx, my, mz, ops);
-  if (def.cp) {
-    const entry = def.cp === 'pass' ? name + '_pass' : name;
-    writeLap([...lapNames(), entry], lapIsCircuit(), ops);
-  }
+  if (def.cp) writeLap([...lapNames(), ...lapEntriesFor(def, name)], lapIsCircuit(), ops);
   pushUndoOps(ops);
   editState.dirty = true;
   return rebuildFromDoc().then(() => selectElementByName(name));
@@ -3711,7 +3793,7 @@ function placeAllPalette() {
     buildPlacement(def, name,
       (i % cols) * TEST_GRID_STEP, -Math.floor(i / cols) * TEST_GRID_STEP, 0, ops);
     placed.push(name);
-    if (def.cp) lap.push(def.cp === 'pass' ? name + '_pass' : name);
+    lap.push(...lapEntriesFor(def, name));
   });
   // one lap write for the whole batch, not one per gate
   writeLap(lap, lapIsCircuit(), ops);
@@ -4092,6 +4174,20 @@ function renderLapPanel() {
     `<button data-act="rm" title="remove from lap">✕</button></div>`).join('') ||
     '<div class="hint">no checkpoints in the lap yet — place a gate or select an object and “+ lap”</div>';
   document.getElementById('lapCircuit').checked = lapIsCircuit();
+  refreshLapSub();
+}
+// a multi-checkpoint object (pole cube, ladder) lists each of its checkpoints
+// so "+ lap" can add any one of them; a plain gate hides the selector
+function refreshLapSub() {
+  const sel = document.getElementById('edLapSub');
+  const ei = editUi.selectedName ? elemIndexByName(editUi.selectedName) : -1;
+  const subs = ei >= 0 ? currentData?.elements[ei]?.cpNames || [] : [];
+  sel.style.display = subs.length > 1 ? '' : 'none';
+  if (subs.length < 2) { sel.innerHTML = ''; return; }
+  const keep = sel.value;
+  sel.innerHTML = subs.map(n => `<option value="${escapeHtml(n)}">` +
+    `${escapeHtml(n.split('.').slice(1).join('.'))}</option>`).join('');
+  if (subs.includes(keep)) sel.value = keep;
 }
 document.getElementById('lapList').addEventListener('click', e => {
   const row = e.target.closest('.lapRow');
@@ -4177,7 +4273,9 @@ document.getElementById('lapCircuit').addEventListener('change', e => {
 document.getElementById('edLapAdd').onclick = () => {
   if (!editUi.selectedName) return;
   const ops = [];
-  writeLap([...lapNames(), listNameFor(editUi.selectedName)], lapIsCircuit(), ops);
+  const sub = document.getElementById('edLapSub');
+  const entry = sub.style.display !== 'none' && sub.value ? sub.value : listNameFor(editUi.selectedName);
+  writeLap([...lapNames(), entry], lapIsCircuit(), ops);
   pushUndoOps(ops);
   editState.dirty = true;
   rebuildFromDoc();
@@ -4239,7 +4337,7 @@ document.getElementById('edColAll').onclick = () => applyColor('all');
 // don't show up as an empty "no mesh" preview. Champs25 gate/pole, the DiveGate
 // deco frame, and the championship launch stand live only in the local overlay.
 // Restore them by emptying this set once the models ship in models.json.
-const HIDDEN_NO_MODEL = new Set(['champs', 'divecl', 'poleC25', 'standC']);
+const HIDDEN_NO_MODEL = new Set(['divecl', 'standC']);
 
 // the search term is module state rather than being read off the input, so the
 // palette can be re-rendered from anywhere (a component was saved, the shared
