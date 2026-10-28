@@ -942,17 +942,50 @@ import { neonParts, glowName, hexToLinear, GLOW_HDR, NEON_DEFAULT_HEX } from './
 import { lensCalibrationXml, lensCalPlatform, lensOffset, LENS_CAL_DEFAULTS, MRSIM_FRAMES,
   MRSIM_LENSES, STAND_TOP } from './lib/lens-cal.js';
 
-// ---- tracks bundled in the repo (MRSIM .xml scene graphs) ----------------
-// Any file that parses as <Simulation>. Add to this list or use ?track=<path>
-// / the file picker. These are the importer outputs + a community track.
-const BUNDLED = [
-  ['tracks/2026-australian-nationals-final.xml', '2026 Australian Nationals (final)'],
-  ['tracks/First practice with a double cube-sloogus.xml', 'community: double-cube (sloogus)'],
-  ['tracks/imported-au-nats.xml',       'imported: 2024 AU Nats Quali'],
-  ['tracks/imported-2026-au-nats.xml',  'imported: 2026 AU Nats'],
-  ['tracks/imported-aus-nats.xml',      'imported: AUS Nats'],
-  ['tracks/imported-dutch.xml',         'imported: Dutch Drone Madness'],
-];
+// ---- recent tracks ---------------------------------------------------------
+// The track list shows the tracks this browser has worked on: every opened or
+// imported file, and a new track once it has an edit. Each one is kept in
+// IndexedDB (tracks can be hundreds of KB, too big for localStorage) and is
+// saved again after every edit. It never leaves this browser — exporting is
+// still the real save. Without IndexedDB (a private window, blocked site
+// data) the list stays empty and everything else works.
+const RECENT_DB = 'fpv-track-editor', RECENT_STORE = 'tracks', RECENT_MAX = 20;
+let recentDbP = null;
+function recentDb() {
+  recentDbP ||= new Promise((res, rej) => {
+    const rq = indexedDB.open(RECENT_DB, 1);
+    rq.onupgradeneeded = () => rq.result.createObjectStore(RECENT_STORE, { keyPath: 'id' });
+    rq.onsuccess = () => res(rq.result);
+    rq.onerror = () => rej(rq.error);
+  });
+  return recentDbP;
+}
+async function recentTx(mode, fn) {
+  const db = await recentDb();
+  return new Promise((res, rej) => {
+    const tx = db.transaction(RECENT_STORE, mode);
+    const out = fn(tx.objectStore(RECENT_STORE));
+    tx.oncomplete = () => res(out?.result);
+    tx.onerror = () => rej(tx.error);
+  });
+}
+async function recentList() {
+  try {
+    const all = await recentTx('readonly', st => st.getAll());
+    return (all || []).sort((a, b) => b.updated - a.updated);
+  } catch { return []; }
+}
+async function recentPut(rec) {
+  try {
+    await recentTx('readwrite', st => st.put(rec));
+    const all = await recentList();                 // keep the newest RECENT_MAX
+    const old = all.slice(RECENT_MAX);
+    if (old.length) await recentTx('readwrite', st => old.forEach(r => st.delete(r.id)));
+  } catch { /* storage full or blocked: the list just does not update */ }
+}
+async function recentClear() {
+  try { await recentTx('readwrite', st => st.clear()); } catch {}
+}
 
 // ---------------------------------------------------------------------------
 // three.js scene
@@ -1905,6 +1938,9 @@ async function loadFromText(text, fileName, opts = {}) {
     editState = {
       doc: new DOMParser().parseFromString(text, 'text/xml'),
       fileName, index: new Map(), dirty: false, undo: [], redo: [],
+      // the recent-tracks key: reopening a file updates its entry, while
+      // every new track gets its own
+      trackId: opts.trackId || (fileName === 'new-track.xml' ? 'new-' + Date.now() : fileName),
     };
     // repair a pre-2026-08-20 track in place, so anything the editor exports
     // is loadable by the game sitting on the user's disk right now
@@ -1928,6 +1964,9 @@ async function loadFromText(text, fileName, opts = {}) {
   if (opts.keepSelection != null) selectElementByName(opts.keepSelection, true);
   else if (editUi.selectedName) selectElementByName(editUi.selectedName, true);
   renderLapPanel();
+  // a new blank track joins the recent list at its first edit, anything
+  // opened or imported at once
+  if (editState.dirty || !String(editState.trackId).startsWith('new-')) scheduleRecentSave();
   // expose everything for headless inspection via preview_eval
   window.__mrsim = {
     fileName, meta: data.meta,
@@ -5718,6 +5757,7 @@ window.__edit = {
       (currentData.elements.find(e => e.isStart) || {}).name || null);
   },
   lap: () => ({ names: lapNames(), isCircuit: lapIsCircuit() }),
+  recent: () => recentList().then(l => l.map(r => ({ id: r.id, fileName: r.fileName, bytes: r.xml.length }))),
   lapAdd: name => { const ops = [];
     writeLap([...lapNames(), name], lapIsCircuit(), ops);
     pushUndoOps(ops); editState.dirty = true; return rebuildFromDoc(); },
@@ -5736,20 +5776,58 @@ window.__edit = {
 };
 
 // ---- UI wiring ----
+// the track list: this browser's recent tracks, newest first
 const trackSel = document.getElementById('track');
-BUNDLED.forEach(([path, label]) => {
-  const o = document.createElement('option'); o.value = path; o.textContent = label;
-  trackSel.appendChild(o);
-});
-// the select is the record of which bundled track is showing, so every path
-// that changes it goes through syncTrackSel — that keeps the value to fall
-// back to when a load is cancelled at the unsaved-edits prompt
-let lastTrackValue = '';
-function syncTrackSel(idx) { trackSel.selectedIndex = idx; lastTrackValue = trackSel.value; }
-trackSel.onchange = () => {
-  if (!confirmDiscard('Loading another track')) { trackSel.value = lastTrackValue; return; }
-  lastTrackValue = trackSel.value;
-  loadFromUrl(trackSel.value);
+const recentLabel = r => {
+  const when = new Date(r.updated).toLocaleString(undefined,
+    { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  const name = r.id.startsWith('new-') ? 'new track' : r.fileName.replace(/\.xml$/i, '');
+  return `${name} · ${when}`;
+};
+async function renderTrackSel() {
+  const list = await recentList();
+  const cur = editState?.trackId;
+  trackSel.innerHTML =
+    `<option value="" disabled${list.some(r => r.id === cur) ? '' : ' selected'}>` +
+      (list.length ? `recent tracks (${list.length})` : 'recent tracks: none yet') + '</option>' +
+    list.map(r => `<option value="${escapeHtml(r.id)}"${r.id === cur ? ' selected' : ''}>` +
+      `${escapeHtml(recentLabel(r))}</option>`).join('') +
+    (list.length ? '<option value="__clear">clear this list…</option>' : '');
+  trackSel.title = 'tracks this browser has worked on — saved here after every edit; ' +
+    'export to keep a file';
+}
+// kept for the callers that reset the list before a load
+function syncTrackSel() { renderTrackSel(); }
+// one pending save at a time, for the track it was made for: an edit waits
+// 600 ms so a drag does not write on every frame, and a switch to another
+// track saves the old one at once instead of dropping its last edit
+let recentPending = null;               // { st, timer }
+const saveRecentNow = async st => {
+  if (!st?.doc) return;
+  await recentPut({ id: st.trackId, fileName: st.fileName,
+    xml: new XMLSerializer().serializeToString(st.doc), updated: Date.now() });
+  renderTrackSel();
+};
+function scheduleRecentSave() {
+  if (recentPending) {
+    clearTimeout(recentPending.timer);
+    if (recentPending.st !== editState) saveRecentNow(recentPending.st);
+  }
+  const st = editState;
+  recentPending = { st, timer: setTimeout(() => { recentPending = null; saveRecentNow(st); }, 600) };
+}
+trackSel.onchange = async () => {
+  const id = trackSel.value;
+  if (id === '__clear') {
+    if (confirm('Clear the recent tracks list in this browser?\n\nExported files are not touched.')) await recentClear();
+    return renderTrackSel();
+  }
+  if (!id || id === editState?.trackId) return renderTrackSel();
+  if (!confirmDiscard('Loading another track')) return renderTrackSel();
+  const rec = (await recentList()).find(r => r.id === id);
+  if (!rec) return renderTrackSel();
+  await loadFromText(rec.xml, rec.fileName, { trackId: rec.id });
+  renderTrackSel();
 };
 
 // import: MRSIM .xml directly; VelociDrone .trk / viewer .json through the
@@ -6327,6 +6405,7 @@ window.__templates = {
 document.getElementById('btnUndo').onclick = undoEdit;
 document.getElementById('btnRedo').onclick = redoEdit;
 const qs = new URLSearchParams(location.search).get('track');
-if (qs) { syncTrackSel(-1); loadFromUrl(qs); }
-else { syncTrackSel(-1); loadFromText(NEW_TRACK_XML, 'new-track.xml').then(() => setEditMode(true)); }
+renderTrackSel();
+if (qs) loadFromUrl(qs);
+else loadFromText(NEW_TRACK_XML, 'new-track.xml').then(() => setEditMode(true));
 </script>
