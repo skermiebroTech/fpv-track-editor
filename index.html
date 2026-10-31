@@ -308,6 +308,116 @@
   #editPanel .btnRow button.on { background: #4a1e1e; border-color: var(--danger); color: #ff9a8a; }
   #editPanel .btnRow button:disabled { opacity: .4; cursor: default;
     background: var(--surface-2); border-color: var(--line-2); }
+  /* gate indicator: a clickable sketch of a multi-checkpoint object (pole
+     cube, ladder) — pick a face, then the way through it */
+  #gateInd .giCard { position: relative; margin-top: 4px; background: var(--bg); border: 1px solid var(--line-3);
+    border-radius: var(--r); overflow: hidden; }
+  #gateInd #giBox { padding: 8px 6px 2px; }
+  #gateInd #giBox svg { display: block; width: 100%; max-height: 240px; user-select: none;
+    cursor: grab; touch-action: none; }
+  #gateInd #giBox.turning svg { cursor: grabbing; }
+  #gateInd .giGround { fill: #ffffff08; stroke: #ffffff1a; stroke-width: 1; pointer-events: none; }
+  #gateInd .giSync { position: absolute; top: 6px; right: 6px; z-index: 1;
+    background: var(--accent-bg); color: #cfe0ff; border: 1px solid var(--accent);
+    border-radius: var(--r-sm); font: inherit; font-size: 10.5px; padding: 2px 7px; cursor: pointer; }
+  #gateInd .giSync:hover { background: var(--accent); color: #fff; }
+  #gateInd .giSync[hidden] { display: none; }
+  #gateInd .giDim { position: absolute; top: 6px; left: 6px; z-index: 1; display: flex;
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); overflow: hidden; }
+  #gateInd .giDim button { background: var(--surface-2); color: var(--dim); border: 0;
+    font: inherit; font-size: 10px; padding: 1px 6px; cursor: pointer; }
+  #gateInd .giDim button + button { border-left: 1px solid var(--line-2); }
+  #gateInd .giDim button:hover { color: var(--text); }
+  #gateInd .giDim button.on { background: var(--accent-bg); color: #cfe0ff; }
+  #gateInd .giStatus { min-height: 18px; padding: 3px 8px 6px; font-size: 10.5px;
+    color: var(--faint); text-align: center; transition: color var(--t); }
+  #gateInd .giStatus b { color: var(--text); font-weight: 600; }
+  #gateInd .giStatus.ok, #gateInd .giStatus.ok b { color: var(--ok); }
+  #gateInd .giF { fill: #5a8dff17; stroke: #5a8dff70; stroke-width: 1.2;
+    stroke-linejoin: round; cursor: pointer; transition: fill var(--t), stroke var(--t); }
+  #gateInd .giF.used { fill: #ffd76a14; stroke: #ffd76a73; }
+  #gateInd .giF:hover, #gateInd .giF.hov { fill: #5a8dff45; stroke: var(--accent); }
+  #gateInd .giF.on { fill: #86c45259; stroke: var(--edit-text); stroke-width: 1.8; }
+  #gateInd .giF.flash { animation: giFlash .6s ease-out; }
+  @keyframes giFlash { from { fill: #ffd76acc; } }
+  #gateInd .giPole { stroke: #3a4458; stroke-width: 2.4; stroke-linecap: round; }
+  #gateInd .giArrow { stroke: var(--glow); stroke-width: 2.2; fill: none; pointer-events: none; }
+  #gateInd .giTip { fill: var(--glow); pointer-events: none; }
+  #gateInd .giArrow.ghost { stroke: #9fbcff; stroke-dasharray: 3 3; }
+  #gateInd .giTip.ghost { fill: #9fbcff; }
+  #gateInd .giLbl { fill: #8a93a6; font-size: 8.5px; pointer-events: none; text-anchor: middle; }
+  #gateInd .giPill { pointer-events: none; }
+  #gateInd .giPill rect { fill: var(--glow); }
+  #gateInd .giPill text { fill: #1a1606; font-size: 7.5px; font-weight: 700; text-anchor: middle; }
+  #gateInd .giChips { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 2px 6px; }
+  #gateInd .giChips button { background: var(--surface-2); color: var(--text);
+    border: 1px solid var(--line-2); border-radius: var(--r-sm); padding: 3px 7px;
+    font: inherit; font-size: 11px; cursor: pointer; }
+  #gateInd .giChips button.on { background: var(--edit-bg); border-color: var(--edit);
+    color: var(--edit-text); }
+  /* face + way-through row */
+  #gateInd .giPick { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+  #gateInd .giPick .k { color: var(--dim); font-size: 11px; }
+  #gateInd .giBadge { padding: 1px 8px; border-radius: 99px; font-size: 11px;
+    border: 1px solid var(--edit); color: var(--edit-text); background: var(--edit-bg);
+    max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #gateInd .giSeg { display: flex; margin-left: auto; border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); overflow: hidden; }
+  #gateInd .giSeg button { background: var(--surface-2); color: var(--dim); border: 0;
+    padding: 3px 9px; font: inherit; font-size: 11px; cursor: pointer; }
+  #gateInd .giSeg button + button { border-left: 1px solid var(--line-2); }
+  #gateInd .giSeg button:hover { color: var(--text); background: var(--surface-3); }
+  #gateInd .giSeg button.on { background: var(--edit-bg); color: var(--edit-text); }
+  #editPanel #gateInd .btnRow button.giAdd { background: var(--edit-bg); border-color: var(--edit);
+    color: var(--edit-text); padding: 6px 0; font-weight: 600; }
+  #editPanel #gateInd .btnRow button.giAdd:hover { background: #376428; border-color: var(--edit-text); }
+  #gateInd .giAdd kbd { font: inherit; font-weight: 400; opacity: .7; }
+  /* one-click switch */
+  #gateInd .giSwitch { display: flex; align-items: center; gap: 8px; margin-top: 8px;
+    font-size: 11px; color: var(--dim); cursor: pointer; width: auto; }
+  #gateInd .giSwitch input { position: absolute; opacity: 0; pointer-events: none; }
+  #gateInd .giSwitch .tr { flex: 0 0 auto; width: 26px; height: 14px; border-radius: 99px;
+    background: var(--surface-3); border: 1px solid var(--line-2); position: relative;
+    transition: background var(--t), border-color var(--t); }
+  #gateInd .giSwitch .tr::after { content: ''; position: absolute; top: 1px; left: 1px;
+    width: 10px; height: 10px; border-radius: 50%; background: var(--dim);
+    transition: transform var(--t), background var(--t); }
+  #gateInd .giSwitch input:checked + .tr { background: var(--edit-bg); border-color: var(--edit); }
+  #gateInd .giSwitch input:checked + .tr::after { transform: translateX(12px);
+    background: var(--edit-text); }
+  #gateInd .giSwitch input:focus-visible + .tr { outline: 2px solid var(--accent); outline-offset: 1px; }
+  #gateInd .giSwitch:hover { color: var(--text); }
+  /* this object's run through the lap */
+  #gateInd .giSeqHead { display: flex; align-items: center; margin-top: 10px;
+    font-size: 10.5px; color: var(--dim); text-transform: uppercase; letter-spacing: .6px; }
+  #gateInd .giSeqHead button { margin-left: auto; background: none; border: 1px solid var(--line-2);
+    border-radius: var(--r-sm); color: var(--dim); font: inherit; font-size: 10.5px;
+    text-transform: none; letter-spacing: 0; padding: 1px 7px; cursor: pointer; }
+  #gateInd .giSeqHead button:hover { color: var(--danger-text); border-color: var(--danger); }
+  #gateInd .giSeqHead button:disabled { opacity: .35; cursor: default;
+    color: var(--dim); border-color: var(--line-2); }
+  #gateInd #giSeq { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 2px;
+    margin-top: 5px; font-size: 10.5px; }
+  #gateInd #giSeq .st { padding: 1px 7px 1px 2px; border-radius: 99px; background: var(--surface-2);
+    border: 1px solid var(--line-2); color: var(--text); white-space: nowrap; cursor: pointer;
+    font: inherit; font-size: 10.5px; display: inline-flex; align-items: center; gap: 4px; }
+  #gateInd #giSeq .st:hover { border-color: var(--accent); }
+  #gateInd #giSeq .st { cursor: grab; padding-right: 2px; }
+  #gateInd #giSeq .st.dragging { opacity: .35; }
+  #gateInd #giSeq .st.dropBefore { box-shadow: -3px 0 0 var(--edit); }
+  #gateInd #giSeq .st.dropAfter { box-shadow: 3px 0 0 var(--edit); }
+  #gateInd #giSeq .st .x { flex: 0 0 auto; width: 16px; height: 16px; margin-left: 2px;
+    display: inline-flex; align-items: center; justify-content: center;
+    background: #4a1e1e; border: 1px solid var(--danger); color: var(--danger-text);
+    font: inherit; font-size: 11px; font-weight: 700; line-height: 1; padding: 0;
+    border-radius: 50%; cursor: pointer; }
+  #gateInd #giSeq .st .x:hover { background: var(--danger); color: #fff; }
+  #gateInd #giSeq .st.on { border-color: var(--edit); }
+  #gateInd #giSeq .st .n { min-width: 15px; padding: 0 3px; border-radius: 99px;
+    background: var(--glow); color: #1a1606; font-weight: 700; text-align: center; }
+  #gateInd #giSeq .st .m { color: var(--dim); }
+  #gateInd #giSeq .to { color: var(--faint); }
+  #gateInd #giSeq .empty { color: var(--faint); }
   #editPanel .lapCk { display: flex; align-items: center; gap: 6px; margin-top: 6px;
     color: var(--dim); font-size: 11.5px; }
   #editPanel h2 { font-size: 13px; margin: 0 0 8px; color: var(--edit-text);
@@ -738,9 +848,31 @@
       <input id="edRefPitch" type="number" step="1" title="ref pitch">
       <input id="edRefRoll" type="number" step="1" title="ref roll"></div>
   </div>
+  <div id="gateInd" style="display:none">
+    <h3 class="sub">gate indicator</h3>
+    <div class="subhint">pick a face on the sketch, then the way through it ·
+      drag the entries under “in the lap” to reorder them</div>
+    <div class="giCard">
+      <div id="giDim" class="giDim" role="group" aria-label="sketch style">
+        <button data-dim="3d" class="on" title="3D view that turns with the main camera">3D</button>
+        <button data-dim="2d" title="flat sketch: every face spread out at once">2D</button></div>
+      <button id="giSync" class="giSync" hidden
+        title="turn the sketch back to the 3D view's angle">match view</button>
+      <div id="giBox"></div>
+      <div id="giStatus" class="giStatus"></div>
+    </div>
+    <div class="giPick">
+      <span class="k">face</span><span id="giFace" class="giBadge"></span>
+      <div id="giModes" class="giSeg" role="group" aria-label="way through"></div>
+    </div>
+    <div class="btnRow"><button id="giAdd" class="giAdd"></button></div>
+    <label class="giSwitch" title="each face click joins the lap at once, then in and out swap">
+      <input type="checkbox" id="giQuick"><span class="tr"></span>one-click add</label>
+    <div class="giSeqHead">in the lap<button id="giUndo"
+      title="remove this object's last entry from the lap">undo last</button></div>
+    <div id="giSeq"></div>
+  </div>
   <div class="btnRow">
-    <select id="edLapSub" style="display:none"
-      title="this object holds more than one checkpoint — pick the one “+ lap” adds"></select>
     <button id="edLapAdd">+ lap</button>
     <button id="edDup">duplicate</button>
     <button id="edDel" class="danger">✕ delete</button>
@@ -920,7 +1052,7 @@
   "imports": {
     "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
     "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/",
-    "./mrsim.js": "./mrsim.js?v=13",
+    "./mrsim.js": "./mrsim.js?v=14",
     "./mrsim-lib.js": "./mrsim-lib.js?v=6"
   }
 }
@@ -4252,18 +4384,575 @@ function renderLapPanel() {
   document.getElementById('lapCircuit').checked = lapIsCircuit();
   refreshLapSub();
 }
-// a multi-checkpoint object (pole cube, ladder) lists each of its checkpoints
-// so "+ lap" can add any one of them; a plain gate hides the selector
-function refreshLapSub() {
-  const sel = document.getElementById('edLapSub');
+// ---- gate indicator --------------------------------------------------------
+// a multi-checkpoint object (pole cube, ladder) shows a clickable sketch of its
+// faces so the lap can take any one of them, in any order. Each checkpoint
+// name splits into a FACE and a MODE: "cube.lower.frontEntry" -> lower.front +
+// Entry (fly in or out through that cube face), "lad.level2.back" -> level2 +
+// back (fly through that rung from the back). A plain gate hides the panel.
+// The sketch is a 3D view of the object that turns with the main camera, and
+// the picked face also lights up in the 3D view as a yellow ring + arrow.
+// mode wording: the toggle button, the short tag on the sketch, a sentence
+const GI_MODE = {
+  Entry: { btn: 'in', tag: 'in', say: f => `fly in through the ${f} face` },
+  Exit:  { btn: 'out', tag: 'out', say: f => `fly out through the ${f} face` },
+  front: { btn: 'from front', tag: 'F', say: f => `fly through ${f} from the front` },
+  back:  { btn: 'from back', tag: 'B', say: f => `fly through ${f} from the back` },
+};
+const giWord = m => GI_MODE[m] || { btn: m || 'pass', tag: m, say: f => `fly through ${f}` };
+const GI_ORDER = ['Entry', 'Exit', 'front', 'back'];
+// after an add the next pass usually leaves the object (in -> out) or comes back
+const GI_FLIP = { Entry: 'Exit', Exit: 'Entry' };
+const gi = { elem: null, face: null, mode: null, hover: null, status: null, flash: null,
+  faces: null, seq: [] };
+function splitCpSub(full) {
+  const segs = full.split('.').slice(1);
+  const last = segs.pop() || '';
+  const m = /^(.+?)(Entry|Exit)$/.exec(last);
+  if (m) return { face: [...segs, m[1]].join('.'), mode: m[2] };
+  if ((last === 'front' || last === 'back') && segs.length)
+    return { face: segs.join('.'), mode: last };
+  return { face: [...segs, last].join('.') || full, mode: '' };
+}
+// face -> { mode -> full lap name }, in the object's own order
+function giFaces(subs) {
+  const faces = new Map();
+  for (const n of subs) {
+    const { face, mode } = splitCpSub(n);
+    if (!faces.has(face)) faces.set(face, new Map());
+    faces.get(face).set(mode, n);
+  }
+  return faces;
+}
+const giModesOf = face => [...(gi.faces?.get(face)?.keys() || [])]
+  .sort((a, b) => GI_ORDER.indexOf(a) - GI_ORDER.indexOf(b));
+// the mode a face gets when picked: keep the current one if the face has it
+const giModeFor = face => giModesOf(face).includes(gi.mode) ? gi.mode : giModesOf(face)[0];
+function giSubs() {
   const ei = editUi.selectedName ? elemIndexByName(editUi.selectedName) : -1;
-  const subs = ei >= 0 ? currentData?.elements[ei]?.cpNames || [] : [];
-  sel.style.display = subs.length > 1 ? '' : 'none';
-  if (subs.length < 2) { sel.innerHTML = ''; return; }
-  const keep = sel.value;
-  sel.innerHTML = subs.map(n => `<option value="${escapeHtml(n)}">` +
-    `${escapeHtml(n.split('.').slice(1).join('.'))}</option>`).join('');
-  if (subs.includes(keep)) sel.value = keep;
+  return ei >= 0 ? currentData?.elements[ei]?.cpNames || [] : [];
+}
+// the lap name the panel points at, or null when it is hidden
+function giPick() {
+  if (document.getElementById('gateInd').style.display === 'none') return null;
+  return gi.faces?.get(gi.face)?.get(gi.mode) || null;
+}
+function refreshLapSub() {
+  const panel = document.getElementById('gateInd');
+  const subs = giSubs();
+  panel.style.display = subs.length > 1 ? '' : 'none';
+  if (subs.length < 2) { gi.elem = null; giPreview(null); return; }
+  gi.faces = giFaces(subs);
+  // a new object: start on the straight pass along +Y the palette adds
+  if (gi.elem !== editUi.selectedName || !gi.faces.has(gi.face)) {
+    gi.elem = editUi.selectedName;
+    gi.hover = gi.status = gi.flash = null;
+    giView.synced = true;
+    const first = subs.find(n => /(^|\.)frontEntry$|\.front$/.test(n)) || subs[0];
+    ({ face: gi.face, mode: gi.mode } = splitCpSub(first));
+  }
+  gi.mode = giModeFor(gi.face);
+  const pre = editUi.selectedName + '.';
+  const lap = lapNames();
+  gi.seq = lap.map((n, i) => ({ n, i: i + 1 })).filter(e => e.n.startsWith(pre))
+    .map(e => ({ ...e, ...splitCpSub(e.n) }));
+
+  const badge = document.getElementById('giFace');
+  badge.textContent = gi.face; badge.title = gi.face;
+  document.getElementById('giModes').innerHTML = giModesOf(gi.face).map(m =>
+    `<button data-mode="${escapeHtml(m)}" class="${m === gi.mode ? 'on' : ''}" ` +
+    `aria-pressed="${m === gi.mode}" title="${escapeHtml(giWord(m).say(gi.face))}">` +
+    `${escapeHtml(giWord(m).btn)}</button>`).join('');
+  const add = document.getElementById('giAdd');
+  add.innerHTML = `+ add ${escapeHtml(gi.face)} ${escapeHtml(giWord(gi.mode).btn)} ` +
+    `<kbd>as #${lap.length + 1}</kbd>`;
+  add.title = giWord(gi.mode).say(gi.face) + ' — joins the end of the lap';
+
+  const seqBox = document.getElementById('giSeq');
+  seqBox.innerHTML = gi.seq.length
+    ? gi.seq.map((e, k) => (k ? '<span class="to">›</span>' : '') +
+      `<span class="st${e.face === gi.face && e.mode === gi.mode ? ' on' : ''}" draggable="true" ` +
+      `data-i="${e.i - 1}" data-face="${escapeHtml(e.face)}" data-mode="${escapeHtml(e.mode)}" ` +
+      `title="lap #${e.i}: ${escapeHtml(giWord(e.mode).say(e.face))} — click to pick it, drag to reorder">` +
+      `<span class="n">${e.i}</span>${escapeHtml(e.face)}` +
+      `<span class="m">${escapeHtml(giWord(e.mode).btn)}</span>` +
+      `<button class="x" data-act="rm" title="remove lap #${e.i} from the lap" ` +
+      `aria-label="remove lap #${e.i}">✕</button></span>`).join('')
+    : '<span class="empty">not in the lap yet — add a face above</span>';
+  document.getElementById('giUndo').disabled = !gi.seq.length;
+  giDraw();
+  giPreview(giPick());
+}
+// the sketch + the status line under it (redrawn on hover, so kept light)
+function giDraw() {
+  renderGiSketch(gi.faces, gi.seq);
+  const st = document.getElementById('giStatus');
+  const quick = document.getElementById('giQuick').checked;
+  let html, ok = false;
+  if (gi.hover) {
+    const m = giModeFor(gi.hover);
+    html = quick ? `click to add <b>${escapeHtml(gi.hover)} ${escapeHtml(giWord(m).btn)}</b>`
+      + ` as #${lapNames().length + 1}`
+      : `click to pick <b>${escapeHtml(gi.hover)}</b>`;
+  } else if (gi.status) { html = gi.status; ok = true; }
+  else {
+    const turn = giView.flat ? '' : ' · drag to turn';
+    html = quick ? 'one-click add is on — click faces in flying order' + turn
+      : 'click a face to pick it' + (giView.flat ? ' · arrow = way through' : ' · drag to turn the view');
+  }
+  st.innerHTML = html;
+  st.classList.toggle('ok', ok);
+}
+const GI_SIDES = { front: [0, -1, 0], back: [0, 1, 0], left: [-1, 0, 0],
+  right: [1, 0, 0], top: [0, 0, 1] };
+// rung order for ladders: lower < upper, level1 < level2 ...
+const giRank = f => f === 'lower' ? 0 : f === 'upper' ? 1 : +(/\d+$/.exec(f)?.[0] ?? 9) + 1;
+// the 2D sketch (the "2D" option): isometric, viewer at +X -Y +Z: screen x = (x+y)·cos30,
+// screen y (down) = (x-y)·sin30 - z. Cube faces are pushed out along their
+// normal (an exploded view): the hidden left and back faces go a full cube
+// width out, so the sides read left | front | right | back and stay clickable.
+function renderGiSketch2D(faces, seq = []) {
+  const box = document.getElementById('giBox');
+  const C = Math.cos(Math.PI / 6), S = 0.5, K = 46;
+  const P = ([x, y, z]) => [(x + y) * C * K, ((x - y) * S - z) * K];
+  const names = [...faces.keys()];
+  const side = f => f.split('.').pop();
+  const isCube = names.every(f => side(f) in GI_SIDES);
+  const isLadder = !isCube && names.every(f => [...faces.get(f).keys()]
+    .every(m => m === 'front' || m === 'back'));
+  if (!isCube && !isLadder) {   // unknown layout: plain chips
+    box.innerHTML = '<div class="giChips">' + names.map(f =>
+      `<button data-face="${escapeHtml(f)}" class="${f === gi.face ? 'on' : ''}">` +
+      `${escapeHtml(f)}</button>`).join('') + '</div>';
+    return;
+  }
+  // travel direction through a face for a mode (sketch space)
+  const travel = (f, mode) => {
+    if (isCube) { const n = GI_SIDES[side(f)]; return mode === 'Exit' ? n : n.map(x => -x); }
+    return [0, mode === 'back' ? -1 : 1, 0];   // "front" = the +Y pass the palette adds
+  };
+  const quads = [], poles = [], lbls = [];
+  if (isCube) {
+    const levels = [...new Set(names.map(f => f.split('.').slice(0, -1).join('.')))]
+      .sort((a, b) => giRank(a) - giRank(b));
+    const G = 0.07, GH = 1.12, STEP = 2.3;
+    for (const f of names) {
+      const n = GI_SIDES[side(f)];
+      const z0 = levels.indexOf(f.split('.').slice(0, -1).join('.')) * STEP;
+      const g = n[0] < 0 || n[1] > 0 ? GH : G;
+      const c = [0.5 + n[0] * (0.5 + g), 0.5 + n[1] * (0.5 + g), z0 + 0.5 + n[2] * (0.5 + g)];
+      // two in-plane unit axes of the face; v is "up" on the face
+      const [u, v] = n[2] ? [[1, 0, 0], [0, 1, 0]] : n[0] ? [[0, 1, 0], [0, 0, 1]] : [[1, 0, 0], [0, 0, 1]];
+      const pt = (a, b) => c.map((ci, i) => ci + u[i] * a + v[i] * b);
+      quads.push({ f, pts: [pt(-.5, -.5), pt(.5, -.5), pt(.5, .5), pt(-.5, .5)],
+        depth: c[0] - c[1] + c[2], c, pill: pt(0, n[2] ? .42 : .34), lbl: pt(0, -.3) });
+    }
+    for (const lv of levels) if (lv) lbls.push({ at: [-0.6 - GH, 0, levels.indexOf(lv) * STEP + 0.5], t: lv, end: true });
+  } else {
+    const rungs = names.slice().sort((a, b) => giRank(a) - giRank(b));
+    const H = 1, GAP = 0.08, W = 1.3;
+    rungs.forEach((f, i) => {
+      const z0 = i * (H + GAP) + 0.35;
+      const c = [W / 2, 0, z0 + H / 2];
+      quads.push({ f, pts: [[0, 0, z0], [W, 0, z0], [W, 0, z0 + H], [0, 0, z0 + H]], depth: 0, c,
+        pill: [W / 2, 0, z0 + H / 2 + 0.34] });
+      lbls.push({ at: [W + 0.28, 0, z0 + H / 2], t: f });
+    });
+    const top = rungs.length * (H + GAP) + 0.35;
+    for (const x of [0, W]) {
+      poles.push([[x, 0, 0], [x, 0, top]]);
+      poles.push([[x, 0, 0], [x - 0.3, -0.45, 0]], [[x, 0, 0], [x + 0.3, 0.45, 0]]);
+    }
+  }
+  const arrowAt = (f, mode) => {
+    const q = quads.find(q2 => q2.f === f);
+    const d = travel(f, mode);
+    return q && [q.c.map((ci, i) => ci - d[i] * 0.62), q.c.map((ci, i) => ci + d[i] * 0.62)];
+  };
+  const arrows = [];
+  if (gi.hover && gi.hover !== gi.face) arrows.push({ seg: arrowAt(gi.hover, giModeFor(gi.hover)), ghost: true });
+  arrows.push({ seg: arrowAt(gi.face, gi.mode) });
+  quads.sort((a, b) => a.depth - b.depth);
+  // fit the viewBox around everything drawn
+  const all = [...quads.flatMap(q => q.pts), ...poles.flat(),
+    ...arrows.flatMap(a => a.seg || []), ...lbls.map(l => l.at)].map(P);
+  for (const l of lbls) { const [x, y] = P(l.at); all.push([x + (l.end ? -34 : 34), y]); }
+  const xs = all.map(p => p[0]), ys = all.map(p => p[1]), pad = 10;
+  const x0 = Math.min(...xs) - pad, y0 = Math.min(...ys) - pad;
+  const w = Math.max(...xs) - x0 + pad, h = Math.max(...ys) - y0 + pad;
+  const pts = a => a.map(p => P(p).map(v => v.toFixed(1)).join(',')).join(' ');
+  const f1 = v => v.toFixed(1);
+  let svg = `<svg viewBox="${f1(x0)} ${f1(y0)} ${f1(w)} ${f1(h)}" role="img" aria-label="gate faces">`;
+  for (const [a, b] of poles) {
+    const [p, q] = [P(a), P(b)];
+    svg += `<line class="giPole" x1="${f1(p[0])}" y1="${f1(p[1])}" x2="${f1(q[0])}" y2="${f1(q[1])}"/>`;
+  }
+  for (const q of quads) {
+    const used = seq.some(e => e.face === q.f);
+    const cls = ['giF', used && 'used', q.f === gi.face && 'on', q.f === gi.hover && 'hov',
+      q.f === gi.flash && 'flash'].filter(Boolean).join(' ');
+    svg += `<polygon class="${cls}" data-face="${escapeHtml(q.f)}" points="${pts(q.pts)}">` +
+      `<title>${escapeHtml(q.f)}</title></polygon>`;
+    if (q.lbl) {
+      const [lx, ly] = P(q.lbl);
+      svg += `<text class="giLbl" x="${f1(lx)}" y="${f1(ly + 3)}">${escapeHtml(side(q.f))}</text>`;
+    }
+  }
+  for (const l of lbls) {
+    const [x, y] = P(l.at);
+    svg += `<text class="giLbl" x="${f1(x)}" y="${f1(y + 3)}" style="text-anchor:${l.end ? 'end' : 'start'}">${escapeHtml(l.t)}</text>`;
+  }
+  for (const { seg, ghost } of arrows) {   // way through: solid = picked, dashed = hover
+    if (!seg) continue;
+    const [a, b] = seg.map(P);
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1;
+    const ux = dx / L, uy = dy / L, hl = 9, hw = 5;
+    const bx = b[0] - ux * hl, by = b[1] - uy * hl, g = ghost ? ' ghost' : '';
+    svg += `<line class="giArrow${g}" x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(bx)}" y2="${f1(by)}"/>` +
+      `<polygon class="giTip${g}" points="${f1(b[0])},${f1(b[1])} ${f1(bx - uy * hw)},${f1(by + ux * hw)} ` +
+      `${f1(bx + uy * hw)},${f1(by - ux * hw)}"/>`;
+  }
+  // lap-number pills ("1 in · 4 in") above each used face's centre, clear of the arrow
+  for (const q of quads) {
+    const txt = seq.filter(e => e.face === q.f)
+      .map(e => `${e.i}${giWord(e.mode).tag ? ' ' + giWord(e.mode).tag : ''}`).join(' · ');
+    if (!txt) continue;
+    const [px, py] = P(q.pill), tw = txt.length * 4.4 + 7;
+    svg += `<g class="giPill"><rect x="${f1(px - tw / 2)}" y="${f1(py - 5.5)}" width="${f1(tw)}" ` +
+      `height="11" rx="5.5"/><text x="${f1(px)}" y="${f1(py + 2.6)}">${escapeHtml(txt)}</text></g>`;
+  }
+  box.innerHTML = svg + '</svg>';
+}
+// 3D sketch of the selected object, drawn as SVG so faces stay clickable. It
+// is built from the parsed element itself: each face is its checkpoint's
+// sensor rectangle, the frame is its long pole cylinders, the arrows are the
+// true crossing directions. The view follows the main camera; drag in the
+// sketch to turn it on its own (e.g. to reach a back face), "match view" or a
+// new selection puts it back in step.
+const giView = { synced: true, az: 0, el: 0.5, drag: null, dragged: false, raf: 0, flat: false };
+try { giView.flat = localStorage.getItem('mrsim.giSketch') === '2d'; } catch {}
+const GI_V3 = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const GI_CORNERS = [[-1, -1], [1, -1], [1, 1], [-1, 1]];
+function giViewAngles() {
+  if (giView.synced) {
+    const d = camera.getWorldDirection(GI_V3()).negate();   // towards the eye
+    giView.az = Math.atan2(d.x, d.z);
+    giView.el = Math.asin(THREE.MathUtils.clamp(d.y, -1, 1));
+  }
+  giView.el = THREE.MathUtils.clamp(giView.el, -1.45, 1.45);
+  return giView;
+}
+// faces [{f, pts, c}], frame poles [[a, b]] and the crossing frame of each
+// checkpoint name, all in three (Y-up) world space; null if it can't be drawn
+function giGeometry(el) {
+  if (!el?.cpFrames) return null;
+  const frames = new Map(el.cpNames.map((n, i) => [n, el.cpFrames[i]]));
+  const sensors = (el.sensors || []).filter(s => s.shape === 'box').map(s =>
+    ({ m: s.matrix, d: s.dims, c: GI_V3().setFromMatrixPosition(s.matrix) }));
+  const faces = [];
+  for (const [f, modes] of gi.faces) {
+    const fr = frames.get(modes.values().next().value);
+    if (!fr) return null;
+    const c = fr.pos.clone();
+    let best = null, bd = 1.2;
+    for (const s of sensors) { const d = s.c.distanceTo(c); if (d < bd) { bd = d; best = s; } }
+    let pts;
+    if (best) {   // the sensor box is the passage: width x, thin y, height z
+      pts = GI_CORNERS.map(([a, b]) =>
+        GI_V3(a * best.d[0] / 2, 0, b * best.d[2] / 2).applyMatrix4(best.m));
+    } else {      // no sensor: a 2 m square across the crossing direction
+      const n = fr.dir;
+      const up = Math.abs(n.y) > 0.9 ? GI_V3(0, 0, 1) : GI_V3(0, 1, 0);
+      const u = GI_V3().crossVectors(up, n).normalize(), v = GI_V3().crossVectors(n, u);
+      pts = GI_CORNERS.map(([a, b]) => c.clone().addScaledVector(u, a).addScaledVector(v, b));
+    }
+    faces.push({ f, pts, c });
+  }
+  const poles = (el.prims || []).filter(p => p.shape === 'cyl' && p.dims[1] > 0.5).map(p =>
+    [GI_V3(0, 0, -p.dims[1] / 2).applyMatrix4(p.matrix), GI_V3(0, 0, p.dims[1] / 2).applyMatrix4(p.matrix)]);
+  return { faces, poles, frames };
+}
+function renderGiSketch(faces, seq = []) {
+  document.querySelectorAll('#giDim button').forEach(b =>
+    b.classList.toggle('on', (b.dataset.dim === '2d') === giView.flat));
+  if (giView.flat) {
+    document.getElementById('giSync').hidden = true;
+    return renderGiSketch2D(faces, seq);
+  }
+  const box = document.getElementById('giBox');
+  const ei = editUi.selectedName ? elemIndexByName(editUi.selectedName) : -1;
+  const g = ei >= 0 ? giGeometry(currentData.elements[ei]) : null;
+  if (!g) {   // nothing to draw in 3D: plain chips
+    box.innerHTML = '<div class="giChips">' + [...faces.keys()].map(f =>
+      `<button data-face="${escapeHtml(f)}" class="${f === gi.face ? 'on' : ''}">` +
+      `${escapeHtml(f)}</button>`).join('') + '</div>';
+    return;
+  }
+  // camera for the sketch: orbit angles around the object's centre, a mild
+  // perspective, scaled so the whole object fits a fixed square viewBox
+  const { az, el } = giViewAngles();
+  const pts3 = [...g.faces.flatMap(f => f.pts), ...g.poles.flat()];
+  const bb = new THREE.Box3().setFromPoints(pts3);
+  const ctr = bb.getCenter(GI_V3());
+  const R = Math.max(...pts3.map(p => p.distanceTo(ctr)), 0.5);
+  const eye = GI_V3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+  const toView = new THREE.Matrix4().lookAt(eye, GI_V3(), GI_V3(0, 1, 0)).transpose();
+  const D = R * 4, S = 100 / R;
+  const P = p => {
+    const v = p.clone().sub(ctr).applyMatrix4(toView);
+    const k = D / (D - v.z);
+    return [v.x * k * S, -v.y * k * S, v.z];
+  };
+  const f1 = v => v.toFixed(1);
+  const poly = a => a.map(p => { const [x, y] = P(p); return f1(x) + ',' + f1(y); }).join(' ');
+  const items = [];   // painter's list, far to near
+  // a ground footprint under the object, so up and the object's turn read at once
+  const m = 0.5, gy = bb.min.y;
+  items.push({ z: -1e9, svg: `<polygon class="giGround" points="${poly([
+    GI_V3(bb.min.x - m, gy, bb.min.z - m), GI_V3(bb.max.x + m, gy, bb.min.z - m),
+    GI_V3(bb.max.x + m, gy, bb.max.z + m), GI_V3(bb.min.x - m, gy, bb.max.z + m)])}"/>` });
+  for (const [a, b] of g.poles) {
+    const [pa, pb] = [P(a), P(b)];
+    items.push({ z: (pa[2] + pb[2]) / 2, svg: `<line class="giPole" x1="${f1(pa[0])}" ` +
+      `y1="${f1(pa[1])}" x2="${f1(pb[0])}" y2="${f1(pb[1])}"/>` });
+  }
+  for (const q of g.faces) {
+    const used = seq.some(e => e.face === q.f);
+    const cls = ['giF', used && 'used', q.f === gi.face && 'on', q.f === gi.hover && 'hov',
+      q.f === gi.flash && 'flash'].filter(Boolean).join(' ');
+    const z = q.pts.reduce((s, p) => s + P(p)[2], 0) / 4;
+    const [cx, cy] = P(q.c);
+    items.push({ z, svg: `<polygon class="${cls}" data-face="${escapeHtml(q.f)}" points="${poly(q.pts)}">` +
+      `<title>${escapeHtml(q.f)}</title></polygon>` +
+      `<text class="giLbl" x="${f1(cx)}" y="${f1(cy + 3)}">${escapeHtml(q.f.split('.').pop())}</text>` });
+  }
+  items.sort((a, b) => a.z - b.z);
+  let svg = `<svg viewBox="-112 -112 224 224" role="img" aria-label="gate faces">` +
+    items.map(i => i.svg).join('');
+  // way through: solid = picked, dashed = hover; straight from the checkpoint frame
+  const arrowFor = (f, mode) => {
+    const fr = g.frames.get(gi.faces.get(f)?.get(mode));
+    return fr && [fr.pos.clone().addScaledVector(fr.dir, -0.95), fr.pos.clone().addScaledVector(fr.dir, 0.95)];
+  };
+  const arrows = [];
+  if (gi.hover && gi.hover !== gi.face) arrows.push({ seg: arrowFor(gi.hover, giModeFor(gi.hover)), ghost: true });
+  arrows.push({ seg: arrowFor(gi.face, gi.mode) });
+  for (const { seg, ghost } of arrows) {
+    if (!seg) continue;
+    const [a, b] = seg.map(P);
+    const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy);
+    const cls = ghost ? ' ghost' : '';
+    if (L < 6) {   // seen head-on: a target mark instead of a dot-sized arrow
+      const near = b[2] > a[2];   // tip coming at the viewer
+      svg += `<circle class="giArrow${cls}" cx="${f1(b[0])}" cy="${f1(b[1])}" r="6"/>` +
+        (near ? `<circle class="giTip${cls}" cx="${f1(b[0])}" cy="${f1(b[1])}" r="2.4"/>`
+          : `<path class="giArrow${cls}" d="M${f1(b[0] - 4)},${f1(b[1] - 4)}l8,8m0,-8l-8,8"/>`);
+      continue;
+    }
+    const ux = dx / L, uy = dy / L, hl = Math.min(9, L * 0.45), hw = hl * 0.55;
+    const bx = b[0] - ux * hl, by = b[1] - uy * hl;
+    svg += `<line class="giArrow${cls}" x1="${f1(a[0])}" y1="${f1(a[1])}" x2="${f1(bx)}" y2="${f1(by)}"/>` +
+      `<polygon class="giTip${cls}" points="${f1(b[0])},${f1(b[1])} ${f1(bx - uy * hw)},${f1(by + ux * hw)} ` +
+      `${f1(bx + uy * hw)},${f1(by - ux * hw)}"/>`;
+  }
+  // lap-number pills ("1 in · 4 in") just above each used face's centre
+  for (const q of g.faces) {
+    const txt = seq.filter(e => e.face === q.f)
+      .map(e => `${e.i}${giWord(e.mode).tag ? ' ' + giWord(e.mode).tag : ''}`).join(' · ');
+    if (!txt) continue;
+    const [px, py0] = P(q.c), py = py0 - 13, tw = txt.length * 4.4 + 7;
+    svg += `<g class="giPill"><rect x="${f1(px - tw / 2)}" y="${f1(py - 5.5)}" width="${f1(tw)}" ` +
+      `height="11" rx="5.5"/><text x="${f1(px)}" y="${f1(py + 2.6)}">${escapeHtml(txt)}</text></g>`;
+  }
+  box.innerHTML = svg + '</svg>';
+  document.getElementById('giSync').hidden = giView.synced;
+}
+// follow the main camera while in step with it (one redraw per frame at most)
+controls.addEventListener('change', () => {
+  if (!giView.synced || giView.flat || !gi.faces || giView.raf ||
+    document.getElementById('gateInd').style.display === 'none') return;
+  giView.raf = requestAnimationFrame(() => { giView.raf = 0; giDraw(); });
+});
+// the picked checkpoint in the 3D view: a yellow ring + arrow at its crossing
+// frame, drawn over everything and moved with the object while it is dragged
+const giGroup = new THREE.Group(); scene.add(giGroup);
+const giRingGeo = new THREE.TorusGeometry(0.95, 0.07, 8, 40);
+let giPrevEi = -1;
+function giPreview(name) {
+  const old = giGroup.children.slice();
+  old.forEach(o => giGroup.remove(o));
+  if (giPrevEi >= 0 && renderRefs[giPrevEi])
+    renderRefs[giPrevEi] = renderRefs[giPrevEi].filter(r => !old.includes(r.obj));
+  giPrevEi = -1;
+  if (!name || !editUi.on) return;
+  const ei = elemIndexByName(editUi.selectedName);
+  const el = currentData?.elements[ei];
+  const fr = el?.cpFrames?.[el.cpNames.indexOf(name)];
+  if (!fr) return;
+  const col = '#ffd76a';
+  const ring = new THREE.Mesh(giRingGeo, new THREE.MeshBasicMaterial({
+    color: col, depthTest: false, transparent: true, opacity: 0.95 }));
+  ring.position.copy(fr.pos);
+  ring.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), fr.dir);
+  const arrow = new THREE.ArrowHelper(fr.dir, fr.pos.clone().addScaledVector(fr.dir, -1.3),
+    2.6, col, 0.6, 0.38);
+  arrow.traverse(o => { if (o.material) { o.material.depthTest = false; o.material.transparent = true; } });
+  for (const o of [ring, arrow]) {
+    o.renderOrder = 20;
+    giGroup.add(o);
+    o.updateMatrix();
+    renderRefs[ei]?.push({ obj: o, base: o.matrix.clone() });
+  }
+  giPrevEi = ei;
+}
+const giEl = id => document.getElementById(id);
+giEl('giBox').addEventListener('click', e => {
+  if (giView.dragged) { giView.dragged = false; return; }   // the end of a turn
+  const f = e.target.closest('[data-face]')?.dataset.face;
+  if (!f) return;
+  gi.mode = (gi.face = f, giModeFor(f));
+  if (giEl('giQuick').checked) addToLap();
+  else { gi.status = null; refreshLapSub(); }
+});
+giEl('giBox').addEventListener('mouseover', e => {
+  const f = e.target.closest('[data-face]')?.dataset.face || null;
+  if (f !== gi.hover) { gi.hover = f; giDraw(); }
+});
+giEl('giBox').addEventListener('mouseleave', () => {
+  if (gi.hover) { gi.hover = null; giDraw(); }
+});
+// drag in the sketch to turn it (a short press is still a face click)
+giEl('giBox').addEventListener('pointerdown', e => {
+  if (e.button !== 0 || !gi.faces || giView.flat) return;
+  const { az, el } = giViewAngles();
+  giView.drag = { x: e.clientX, y: e.clientY, az, el, id: e.pointerId };
+  giView.dragged = false;
+});
+giEl('giBox').addEventListener('pointermove', e => {
+  const d = giView.drag;
+  if (!d) return;
+  const dx = e.clientX - d.x, dy = e.clientY - d.y;
+  if (!giView.dragged && Math.hypot(dx, dy) < 4) return;
+  if (!giView.dragged) {   // it is a turn, not a click
+    giView.dragged = true;
+    giEl('giBox').setPointerCapture(d.id);
+    giEl('giBox').classList.add('turning');
+  }
+  giView.synced = false;
+  giView.az = d.az - dx * 0.012;
+  giView.el = d.el + dy * 0.012;
+  gi.hover = null;
+  giDraw();
+});
+const giEndTurn = () => {
+  giView.drag = null;
+  giEl('giBox').classList.remove('turning');
+};
+giEl('giBox').addEventListener('pointerup', giEndTurn);
+giEl('giBox').addEventListener('pointercancel', () => { giEndTurn(); giView.dragged = false; });
+giEl('giSync').addEventListener('click', () => { giView.synced = true; giDraw(); });
+giEl('giDim').addEventListener('click', e => {   // 3D (default) <-> 2D sketch
+  const d = e.target.closest('[data-dim]')?.dataset.dim;
+  if (!d) return;
+  giView.flat = d === '2d';
+  try { localStorage.setItem('mrsim.giSketch', d); } catch {}
+  if (gi.faces) giDraw();
+});
+giEl('giModes').addEventListener('click', e => {
+  const m = e.target.closest('[data-mode]')?.dataset.mode;
+  if (m == null) return;
+  gi.mode = m; gi.status = null;
+  refreshLapSub();
+});
+// write a changed lap as one undo step and redraw
+function giWriteLap(names) {
+  const ops = [];
+  writeLap(names, lapIsCircuit(), ops);
+  pushUndoOps(ops);
+  editState.dirty = true;
+  rebuildFromDoc();
+}
+// remove lap entry `at` (0-based) and pick it, so it can be re-added in one click
+function giRemoveAt(at) {
+  const names = lapNames();
+  if (at < 0 || at >= names.length) return;
+  const gone = splitCpSub(names.splice(at, 1)[0]);
+  gi.status = `removed #${at + 1} ${escapeHtml(gone.face)} ${escapeHtml(giWord(gone.mode).btn)}`;
+  gi.face = gone.face; gi.mode = gone.mode;
+  giWriteLap(names);
+}
+giEl('giSeq').addEventListener('click', e => {
+  const chip = e.target.closest('.st');
+  if (!chip) return;
+  if (e.target.closest('[data-act="rm"]')) { giRemoveAt(+chip.dataset.i); return; }
+  gi.face = chip.dataset.face; gi.mode = chip.dataset.mode; gi.status = null;   // pick it
+  refreshLapSub();
+});
+// drag a chip onto another to move that entry in the lap. The chips wrap in
+// rows, so the cursor's side of the target (left/right half) says before/after.
+// Positions are lap-wide, so other objects' entries between them stay put.
+{
+  const box = giEl('giSeq');
+  let dragI = null;
+  const clear = () => box.querySelectorAll('.st').forEach(c =>
+    c.classList.remove('dragging', 'dropBefore', 'dropAfter'));
+  const target = e => {
+    const chip = e.target.closest('.st');
+    if (!chip) return null;
+    const r = chip.getBoundingClientRect();
+    return { chip, i: +chip.dataset.i, before: e.clientX < r.left + r.width / 2 };
+  };
+  box.addEventListener('dragstart', e => {
+    const chip = e.target.closest('.st');
+    if (!chip) return;
+    dragI = +chip.dataset.i;
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', chip.dataset.i);   // Firefox needs data set
+    chip.classList.add('dragging');
+  });
+  box.addEventListener('dragover', e => {
+    if (dragI === null) return;
+    const t = target(e);
+    if (!t) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    box.querySelectorAll('.st').forEach(c => c.classList.remove('dropBefore', 'dropAfter'));
+    if (t.i !== dragI) t.chip.classList.add(t.before ? 'dropBefore' : 'dropAfter');
+  });
+  box.addEventListener('drop', e => {
+    const t = target(e);
+    if (dragI === null || !t) return;
+    e.preventDefault();
+    const from = dragI;
+    let to = t.i + (t.before ? 0 : 1);
+    if (to > from) to--;                                 // account for the removed entry
+    dragI = null; clear();
+    if (to === from) return;
+    const names = lapNames();
+    const moved = names.splice(from, 1)[0];
+    names.splice(to, 0, moved);
+    const m = splitCpSub(moved);
+    gi.status = `moved ${escapeHtml(m.face)} ${escapeHtml(giWord(m.mode).btn)} to <b>#${to + 1}</b>`;
+    giWriteLap(names);
+  });
+  box.addEventListener('dragend', () => { dragI = null; clear(); });
+}
+giEl('giUndo').addEventListener('click', () => {
+  if (!editUi.selectedName) return;
+  const pre = editUi.selectedName + '.';
+  const names = lapNames();
+  let at = names.length - 1;
+  while (at >= 0 && !names[at].startsWith(pre)) at--;
+  giRemoveAt(at);
+});
+{
+  const q = giEl('giQuick');
+  try { q.checked = localStorage.getItem('mrsim.giQuick') === '1'; } catch {}
+  q.addEventListener('change', () => {
+    try { localStorage.setItem('mrsim.giQuick', q.checked ? '1' : '0'); } catch {}
+    gi.status = null;
+    if (gi.faces) giDraw();
+  });
 }
 document.getElementById('lapList').addEventListener('click', e => {
   const row = e.target.closest('.lapRow');
@@ -4346,16 +5035,25 @@ document.getElementById('lapCircuit').addEventListener('change', e => {
   editState.dirty = true;
   rebuildFromDoc();
 });
-document.getElementById('edLapAdd').onclick = () => {
+const addToLap = () => {
   if (!editUi.selectedName) return;
   const ops = [];
-  const sub = document.getElementById('edLapSub');
-  const entry = sub.style.display !== 'none' && sub.value ? sub.value : listNameFor(editUi.selectedName);
-  writeLap([...lapNames(), entry], lapIsCircuit(), ops);
+  const pick = giPick();
+  const entry = pick || listNameFor(editUi.selectedName);
+  const names = [...lapNames(), entry];
+  if (pick) {   // report it on the panel, flash the face, then swap in <-> out
+    gi.status = `added <b>#${names.length} ${escapeHtml(gi.face)} ${escapeHtml(giWord(gi.mode).btn)}</b>`;
+    gi.flash = gi.face;
+    setTimeout(() => { gi.flash = null; }, 650);
+    if (GI_FLIP[gi.mode]) gi.mode = GI_FLIP[gi.mode];
+  }
+  writeLap(names, lapIsCircuit(), ops);
   pushUndoOps(ops);
   editState.dirty = true;
   rebuildFromDoc();
 };
+document.getElementById('edLapAdd').onclick = addToLap;
+document.getElementById('giAdd').onclick = addToLap;
 document.getElementById('edDel').onclick = deleteSelected;
 document.getElementById('edDup').onclick = duplicateSelected;
 document.getElementById('edToBuilder').onclick = copySelectionToBuilder;
@@ -5608,6 +6306,7 @@ function setEditMode(on) {
   document.getElementById('btnEdit').classList.toggle('edit-on', on);
   document.getElementById('editPanel').classList.toggle('show', on);
   sensorGroup.visible = on;
+  giGroup.visible = on;              // the gate indicator's picked-face ring
   if (!on) tc.detach();
   else if (editUi.selectedName) setPrimary(editUi.selectedName);
   refreshSelectionHighlight();

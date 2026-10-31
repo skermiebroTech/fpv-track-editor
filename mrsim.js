@@ -498,6 +498,13 @@ function assemble(st, fileName) {
       const at = p.indexOf(e.name);
       return (at >= 0 ? p.slice(at) : p).join('.');
     }),
+    // world crossing frame of each of those checkpoints (same order), read
+    // from its CheckpointReference like the lap sequence below
+    cpFrames: e.cps.map(i => {
+      const refM = three(st.checkpoints[i].refM);
+      return { pos: new THREE.Vector3().setFromMatrixPosition(refM),
+        dir: new THREE.Vector3().setFromMatrixColumn(refM, 1).normalize() };
+    }),
     prims: e.prims.map(p => ({
       shape: p.shape, dims: p.dims, hint: p.hint, material: p.material, matrix: three(p.m), src: p.src,
       solid: p.solid !== false,
